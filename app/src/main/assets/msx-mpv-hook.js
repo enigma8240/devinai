@@ -78,10 +78,16 @@
     try {
       const resolvedUrl = new URL(url, window.location.href).href;
       const playlistJson = collectVisiblePlaylistItems();
+      // Many Xtream/IPTV CDNs check Referer (and sometimes UA); the <video> tag
+      // sends these from the browser automatically, mpv does not unless told.
+      const headersJson = JSON.stringify({
+        Referer: window.location.href,
+        "User-Agent": navigator.userAgent,
+      });
       window.MsxMpvBridge.openMpv(
         resolvedUrl,
         title || "Media Station X",
-        "{}",
+        headersJson,
         subtitleUrl || "",
         0,
         playlistJson

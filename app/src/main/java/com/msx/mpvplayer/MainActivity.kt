@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -91,13 +92,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Default Referer for anything we launch mpv for ourselves (not already
+     * carrying its own headersJson from the JS hook). Many Xtream/IPTV CDNs
+     * reject requests with no/wrong Referer - the WebView's own page sends
+     * its own URL as Referer automatically, mpv does not unless told to.
+     */
+    private fun defaultHeadersJson(): String {
+        val referer = webView.url ?: msxEntryUrl
+        return JSONObject().put("Referer", referer).toString()
+    }
+
     private fun handleInterceptedUri(uri: Uri): Boolean {
         val scheme = uri.scheme?.lowercase() ?: return false
         val urlStr = uri.toString()
 
         if (scheme == "mpv" || scheme == "vlc") {
             val targetUrl = urlStr.replaceFirst(Regex("^(mpv|vlc)://", RegexOption.IGNORE_CASE), "https://")
-            launchMpvPlayer(targetUrl, "Media Station X", "{}", "", 0L, "[]")
+            launchMpvPlayer(targetUrl, "Media Station X", defaultHeadersJson(), "", 0L, "[]")
             return true
         }
 
@@ -107,14 +119,14 @@ class MainActivity : AppCompatActivity() {
                 val targetData = parsed.dataString ?: parsed.getStringExtra("url")
                 if (!targetData.isNullOrBlank()) {
                     val title = parsed.getStringExtra("title") ?: "Media Station X"
-                    launchMpvPlayer(targetData, title, "{}", "", 0L, "[]")
+                    launchMpvPlayer(targetData, title, defaultHeadersJson(), "", 0L, "[]")
                     return true
                 }
             } catch (_: Exception) {}
         }
 
         if (true && mediaExtensionRegex.containsMatchIn(urlStr)) {
-            launchMpvPlayer(urlStr, uri.lastPathSegment ?: "Media Station X", "{}", "", 0L, "[]")
+            launchMpvPlayer(urlStr, uri.lastPathSegment ?: "Media Station X", defaultHeadersJson(), "", 0L, "[]")
             return true
         }
 
@@ -158,10 +170,15 @@ class MainActivity : AppCompatActivity() {
             playlistJson: String?
         ) {
             runOnUiThread {
+                val effectiveHeaders = if (headersJson.isNullOrBlank() || headersJson == "{}") {
+                    defaultHeadersJson()
+                } else {
+                    headersJson
+                }
                 launchMpvPlayer(
                     url = url,
                     title = title ?: "Media Station X",
-                    headersJson = headersJson ?: "{}",
+                    headersJson = effectiveHeaders,
                     subtitleUrl = subtitleUrl ?: "",
                     startPositionMs = startPosMs,
                     playlistJson = playlistJson ?: "[]"

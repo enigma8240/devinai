@@ -31,6 +31,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
@@ -102,6 +103,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     private lateinit var btnCloseQualitySheet: Button
 
     private var streamUrl: String = ""
+    private var streamHeaders: Map<String, String> = emptyMap()
     private var currentTitle: String = "Media Station X (MPV)"
     private var currentPosSec: Double = 0.0
     private var durationSec: Double = 0.0
@@ -162,6 +164,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         streamUrl = rawUrl
         currentTitle = intent.getStringExtra(EXTRA_TITLE) ?: "Media Station X (MPV)"
         val subtitleUrl = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
+        streamHeaders = parseHeadersJson(intent.getStringExtra(EXTRA_HEADERS))
 
         initPlaylistData(intent.getStringExtra(EXTRA_PLAYLIST_JSON))
         setupControls()
@@ -181,7 +184,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             }
         }
 
-        mpvView.play(streamUrl, subtitleUrl, startSec)
+        mpvView.play(streamUrl, subtitleUrl, startSec, streamHeaders)
         mpvView.postDelayed({
             mpvView.setSubtitleFontSize(subFontSize)
             mpvView.setSubtitleVerticalPos(subVerticalPos)
@@ -329,7 +332,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         activePlaylistIndex = allPlaylistItems.indexOfFirst { it.url == item.url }.coerceAtLeast(0)
         titleText.text = item.title
         groupBadgeText.text = item.group
-        mpvView.play(item.url)
+        mpvView.play(item.url, headers = streamHeaders)
         refreshBouquetsAndList()
         closeAllSidePanels()
         showOsd()
@@ -699,6 +702,66 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
                 finishWithResult()
             }
         }
+    }
+
+    override fun onPlaybackError() {
+        // mpv could not open/keep playing this URL (network error, blocked by the
+        // CDN, missing headers, unsupported codec...). Previously this looked
+        // identical to a normal end-of-file and silently bounced back to MSX,
+        // which is confusing - show it and keep the player open instead.
+        runOnUiThread {
+            Toast.makeText(
+                this,
+                "Yayın açılamadı (ağ/URL hatası olabilir): $currentTitle",
+                Toast.LENGTH_LONG
+            ).show()
+            showOsd()
+        }
+    }
+
+    private fun parseHeadersJson(json: String?): Map<String, String> {
+        if (json.isNullOrBlank()) return emptyMap()
+        return try {
+            val obj = JSONObject(json)
+            val result = mutableMapOf<String, String>()
+            for (key in obj.keys()) {
+                result[key] = obj.getString(key)
+            }
+            result
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    // TV remotes/kumanda fix: on-screen Buttons are focusable, so by default the
+    // D-pad arrows/center get eaten by Android's own focus-navigation between
+    // those buttons (moving focus or doing nothing visible) instead of ever
+    // reaching onKeyDown() on the Activity - that's why "kumanda çalışmıyor"
+    // (seek/play-pause/channel keys silently do nothing). Intercepting at
+    // dispatchKeyEvent runs before focus handling gets a chance to consume them.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val handledCodes = setOf(
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_MEDIA_REWIND,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+            KeyEvent.KEYCODE_CHANNEL_UP,
+            KeyEvent.KEYCODE_CHANNEL_DOWN,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_BACK
+        )
+        if (!isAnySidePanelOpen() && event.keyCode in handledCodes) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                onKeyDown(event.keyCode, event)
+            }
+            // Consume ACTION_UP too so it never falls through to the focused
+            // button's default click/focus-move behaviour.
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

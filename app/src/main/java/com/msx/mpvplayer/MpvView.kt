@@ -17,10 +17,12 @@ class MpvView @JvmOverloads constructor(
     private var pendingUrl: String? = null
     private var pendingSubtitle: String? = null
     private var pendingStartSec: Double = 0.0
+    private var pendingHeaders: Map<String, String> = emptyMap()
 
     interface Listener {
         fun onPropertyUpdate(property: String, value: Any?)
         fun onEndFile(reason: Int)
+        fun onPlaybackError()
         fun onTracksChanged()
     }
 
@@ -58,7 +60,18 @@ class MpvView @JvmOverloads constructor(
 
         override fun event(eventId: Int) {
             if (eventId == MPVLib.mpvEventId.MPV_EVENT_END_FILE) {
-                listener?.onEndFile(eventId)
+                // mpv fires END_FILE both for a real finished/stopped playback AND for an
+                // immediate open/network/codec failure. Without telling these apart, any
+                // failed stream (wrong headers, blocked by the CDN, etc.) looked exactly
+                // like "mpv opens then instantly bounces back to MSX" - which is exactly
+                // what was reported for Xtream streams. "eof-reached" is false on a real
+                // failure, so use it to only auto-advance/close on genuine completion.
+                val reachedEof = MPVLib.getPropertyBoolean("eof-reached") == true
+                if (reachedEof) {
+                    listener?.onEndFile(eventId)
+                } else {
+                    listener?.onPlaybackError()
+                }
             } else if (eventId == MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED) {
                 listener?.onTracksChanged()
             }
@@ -97,10 +110,11 @@ class MpvView @JvmOverloads constructor(
         initialized = true
     }
 
-    fun play(url: String, subtitleUrl: String = "", startSec: Double = 0.0) {
+    fun play(url: String, subtitleUrl: String = "", startSec: Double = 0.0, headers: Map<String, String> = emptyMap()) {
         pendingUrl = url
         pendingSubtitle = subtitleUrl
         pendingStartSec = startSec
+        pendingHeaders = headers
         if (holder.surface?.isValid == true) {
             startPlaybackInternal()
         }
@@ -109,6 +123,22 @@ class MpvView @JvmOverloads constructor(
     private fun startPlaybackInternal() {
         val url = pendingUrl ?: return
         initializeIfNeeded()
+        // Many Xtream/IPTV panels put a Referer (and sometimes User-Agent) check in
+        // front of the stream; a plain <video> tag sends these from the browser
+        // automatically, but mpv does not unless told to. Without this, a stream
+        // that the WebView could play can be refused/closed instantly by mpv.
+        if (pendingHeaders.isEmpty()) {
+            MPVLib.setOptionString("http-header-fields", "")
+        } else {
+            // mpv string-list options separate items with "," and expect a literal
+            // comma inside an item to be escaped by doubling it ("," -> ",,") - a
+            // User-Agent string ("... (KHTML, like Gecko) ...") has exactly that,
+            // so this must be escaped or mpv misparses the whole option.
+            val headerStr = pendingHeaders.entries.joinToString(",") { (k, v) ->
+                "$k: $v".replace(",", ",,")
+            }
+            MPVLib.setOptionString("http-header-fields", headerStr)
+        }
         MPVLib.setOptionString("start", if (pendingStartSec > 1.0) pendingStartSec.toString() else "0")
         MPVLib.command("loadfile", url, "replace")
         if (!pendingSubtitle.isNullOrBlank()) {
