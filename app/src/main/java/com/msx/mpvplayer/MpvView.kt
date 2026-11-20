@@ -4,7 +4,8 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import `is`.xyz.mpv.MPVLib
+import `is`.xyz.mpv.MPV
+import `is`.xyz.mpv.MPVNode
 import java.io.File
 
 class MpvView @JvmOverloads constructor(
@@ -12,6 +13,7 @@ class MpvView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : SurfaceView(context, attrs), SurfaceHolder.Callback {
 
+    private var mpv: MPV? = null
     private var initialized = false
     private var pendingUrl: String? = null
     private var pendingSubtitle: String? = null
@@ -25,7 +27,7 @@ class MpvView @JvmOverloads constructor(
 
     var listener: Listener? = null
 
-    private val observer = object : MPVLib.EventObserver {
+    private val observer = object : MPV.EventObserver {
         override fun eventProperty(property: String) {
             if (property == "track-list") {
                 listener?.onTracksChanged()
@@ -51,10 +53,14 @@ class MpvView @JvmOverloads constructor(
             }
         }
 
-        override fun event(eventId: Int) {
-            if (eventId == MPVLib.mpvEventId.MPV_EVENT_END_FILE) {
+        override fun eventProperty(property: String, value: MPVNode) {
+            // Node-typed property updates aren't needed by this UI; ignore.
+        }
+
+        override fun event(eventId: Int, data: MPVNode) {
+            if (eventId == MPV.mpvEvent.MPV_EVENT_END_FILE) {
                 listener?.onEndFile(eventId)
-            } else if (eventId == MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED) {
+            } else if (eventId == MPV.mpvEvent.MPV_EVENT_FILE_LOADED) {
                 listener?.onTracksChanged()
             }
         }
@@ -72,23 +78,21 @@ class MpvView @JvmOverloads constructor(
             confFile.outputStream().use { output -> input.copyTo(output) }
         }
 
-        MPVLib.create(context)
-        MPVLib.setOptionString("config", "yes")
-        MPVLib.setOptionString("config-dir", configDir.absolutePath)
-        MPVLib.setOptionString("vo", "gpu")
-        MPVLib.setOptionString("hwdec", "auto-safe")
-        MPVLib.setOptionString("ao", "audiotrack")
-        MPVLib.setOptionString("gpu-context", "android")
-        MPVLib.setOptionString("opengl-es", "yes")
-        MPVLib.init()
+        val instance = MPV(context, configDir = configDir.absolutePath)
+        instance.setOptionString("vo", "gpu")
+        instance.setOptionString("hwdec", "auto-safe")
+        instance.setOptionString("ao", "audiotrack")
+        instance.setOptionString("gpu-context", "android")
+        instance.setOptionString("opengl-es", "yes")
 
-        MPVLib.addObserver(observer)
-        MPVLib.observeProperty("time-pos", MPVLib.mpvFormat.MPV_FORMAT_DOUBLE)
-        MPVLib.observeProperty("duration", MPVLib.mpvFormat.MPV_FORMAT_DOUBLE)
-        MPVLib.observeProperty("pause", MPVLib.mpvFormat.MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("paused-for-cache", MPVLib.mpvFormat.MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("track-list", MPVLib.mpvFormat.MPV_FORMAT_STRING)
+        instance.addObserver(observer)
+        instance.observeProperty("time-pos", MPV.mpvFormat.MPV_FORMAT_DOUBLE)
+        instance.observeProperty("duration", MPV.mpvFormat.MPV_FORMAT_DOUBLE)
+        instance.observeProperty("pause", MPV.mpvFormat.MPV_FORMAT_FLAG)
+        instance.observeProperty("paused-for-cache", MPV.mpvFormat.MPV_FORMAT_FLAG)
+        instance.observeProperty("track-list", MPV.mpvFormat.MPV_FORMAT_STRING)
 
+        mpv = instance
         initialized = true
     }
 
@@ -104,96 +108,87 @@ class MpvView @JvmOverloads constructor(
     private fun startPlaybackInternal() {
         val url = pendingUrl ?: return
         initializeIfNeeded()
-        MPVLib.setOptionString("start", if (pendingStartSec > 1.0) pendingStartSec.toString() else "0")
-        MPVLib.command(arrayOf("loadfile", url, "replace"))
+        val instance = mpv ?: return
+        instance.setOptionString("start", if (pendingStartSec > 1.0) pendingStartSec.toString() else "0")
+        instance.command("loadfile", url, "replace")
         if (!pendingSubtitle.isNullOrBlank()) {
-            MPVLib.command(arrayOf("sub-add", pendingSubtitle!!, "select"))
+            instance.command("sub-add", pendingSubtitle!!, "select")
         }
         pendingUrl = null
     }
 
     fun togglePause() {
-        if (!initialized) return
-        MPVLib.command(arrayOf("cycle", "pause"))
+        mpv?.command("cycle", "pause")
     }
 
     fun seekRelative(seconds: Int) {
-        if (!initialized) return
-        MPVLib.command(arrayOf("seek", seconds.toString(), "relative"))
+        mpv?.command("seek", seconds.toString(), "relative")
     }
 
     fun seekAbsolute(seconds: Double) {
-        if (!initialized) return
-        MPVLib.command(arrayOf("seek", seconds.toString(), "absolute"))
+        mpv?.command("seek", seconds.toString(), "absolute")
     }
 
     fun getTracks(): List<MpvTrackInfo> {
-        if (!initialized) return emptyList()
-        val raw = MPVLib.getPropertyString("track-list")
+        val raw = mpv?.getPropertyString("track-list") ?: return emptyList()
         return PlaylistParser.parseMpvTrackList(raw)
     }
 
     fun selectVideoTrack(trackId: Int?) {
-        if (!initialized) return
-        MPVLib.setPropertyString("vid", trackId?.toString() ?: "auto")
+        mpv?.setPropertyString("vid", trackId?.toString() ?: "auto")
     }
 
     fun selectAudioTrack(trackId: Int) {
-        if (!initialized) return
-        MPVLib.setPropertyInt("aid", trackId)
+        mpv?.setPropertyInt("aid", trackId)
     }
 
     fun selectSubtitleTrack(trackId: Int?) {
-        if (!initialized) return
-        MPVLib.setPropertyString("sid", trackId?.toString() ?: "no")
+        mpv?.setPropertyString("sid", trackId?.toString() ?: "no")
     }
 
     fun setSubtitleFontSize(sizePx: Int) {
-        if (!initialized) return
-        MPVLib.setPropertyInt("sub-font-size", sizePx.coerceIn(20, 90))
+        mpv?.setPropertyInt("sub-font-size", sizePx.coerceIn(20, 90))
     }
 
     fun setSubtitleVerticalPos(posPercent: Int) {
-        if (!initialized) return
-        MPVLib.setPropertyInt("sub-pos", posPercent.coerceIn(5, 100))
+        mpv?.setPropertyInt("sub-pos", posPercent.coerceIn(5, 100))
     }
 
     fun addExternalSubtitle(pathOrUrl: String) {
-        if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command(arrayOf("sub-add", pathOrUrl, "select"))
+        if (pathOrUrl.isBlank()) return
+        mpv?.command("sub-add", pathOrUrl, "select")
     }
 
     fun addExternalAudioTrack(pathOrUrl: String) {
-        if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command(arrayOf("audio-add", pathOrUrl, "select"))
+        if (pathOrUrl.isBlank()) return
+        mpv?.command("audio-add", pathOrUrl, "select")
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         initializeIfNeeded()
-        MPVLib.attachSurface(holder.surface)
-        MPVLib.setOptionString("force-window", "yes")
+        val instance = mpv ?: return
+        instance.attachSurface(holder.surface)
+        instance.setOptionString("force-window", "yes")
         if (pendingUrl != null) {
             startPlaybackInternal()
         }
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        if (initialized) {
-            MPVLib.setPropertyString("android-surface-size", "${width}x${height}")
-        }
+        mpv?.setPropertyString("android-surface-size", "${width}x${height}")
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        if (initialized) {
-            MPVLib.setOptionString("force-window", "no")
-            MPVLib.detachSurface()
-        }
+        val instance = mpv ?: return
+        instance.setOptionString("force-window", "no")
+        instance.detachSurface()
     }
 
     fun releasePlayer() {
-        if (!initialized) return
-        MPVLib.removeObserver(observer)
-        MPVLib.destroy()
+        val instance = mpv ?: return
+        instance.removeObserver(observer)
+        instance.close()
+        mpv = null
         initialized = false
     }
 }
