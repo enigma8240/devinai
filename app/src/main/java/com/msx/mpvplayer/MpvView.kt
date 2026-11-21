@@ -5,6 +5,7 @@ import android.util.AttributeSet
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import `is`.xyz.mpv.MPVLib
+import `is`.xyz.mpv.MPVNode
 import org.json.JSONObject
 import java.io.File
 
@@ -58,6 +59,13 @@ class MpvView @JvmOverloads constructor(
         }
 
         override fun eventProperty(property: String, value: String) {
+            listener?.onPropertyUpdate(property, value)
+            if (property == "track-list") {
+                listener?.onTracksChanged()
+            }
+        }
+
+        override fun eventProperty(property: String, value: MPVNode) {
             listener?.onPropertyUpdate(property, value)
             if (property == "track-list") {
                 listener?.onTracksChanged()
@@ -160,9 +168,9 @@ class MpvView @JvmOverloads constructor(
         MPVLib.setOptionString("user-agent", ua)
         applyPerUrlHeaders(url, pendingHeadersJson, ua)
         MPVLib.setOptionString("start", if (pendingStartSec > 1.0) pendingStartSec.toString() else "0")
-        MPVLib.command(arrayOf("loadfile", url, "replace"))
+        MPVLib.command("loadfile", url, "replace")
         if (!pendingSubtitle.isNullOrBlank()) {
-            MPVLib.command(arrayOf("sub-add", pendingSubtitle!!, "select"))
+            MPVLib.command("sub-add", pendingSubtitle!!, "select")
         }
         pendingUrl = null
     }
@@ -231,7 +239,7 @@ class MpvView @JvmOverloads constructor(
 
     fun togglePause() {
         if (!initialized) return
-        MPVLib.command(arrayOf("cycle", "pause"))
+        MPVLib.command("cycle", "pause")
     }
 
     fun setPaused(paused: Boolean) {
@@ -241,12 +249,12 @@ class MpvView @JvmOverloads constructor(
 
     fun seekRelative(seconds: Int) {
         if (!initialized) return
-        MPVLib.command(arrayOf("seek", seconds.toString(), "relative"))
+        MPVLib.command("seek", seconds.toString(), "relative")
     }
 
     fun seekAbsolute(seconds: Double) {
         if (!initialized) return
-        MPVLib.command(arrayOf("seek", seconds.toString(), "absolute"))
+        MPVLib.command("seek", seconds.toString(), "absolute")
     }
 
     fun getTracks(): List<MpvTrackInfo> {
@@ -282,12 +290,12 @@ class MpvView @JvmOverloads constructor(
 
     fun addExternalSubtitle(pathOrUrl: String) {
         if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command(arrayOf("sub-add", pathOrUrl, "select"))
+        MPVLib.command("sub-add", pathOrUrl, "select")
     }
 
     fun addExternalAudioTrack(pathOrUrl: String) {
         if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command(arrayOf("audio-add", pathOrUrl, "select"))
+        MPVLib.command("audio-add", pathOrUrl, "select")
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
