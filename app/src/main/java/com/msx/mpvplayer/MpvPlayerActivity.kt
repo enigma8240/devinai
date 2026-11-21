@@ -1,5 +1,6 @@
 package com.msx.mpvplayer
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -31,7 +33,6 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
@@ -63,11 +64,20 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     private lateinit var btnPlayPause: Button
     private lateinit var btnFf: Button
     private lateinit var btnNext: Button
+    private lateinit var btnHwdec: Button
+    private lateinit var btnSpeed: Button
     private lateinit var btnPlaylist: Button
     private lateinit var btnQuality: Button
     private lateinit var btnAudio: Button
     private lateinit var btnSub: Button
     private lateinit var btnClose: Button
+
+    // Hata / Yeniden Dene Paneli (Xtream canlı kanal kopmalarında MSX'e atmamak için)
+    private lateinit var errorPanel: View
+    private lateinit var txtErrorDetail: TextView
+    private lateinit var btnErrorRetry: Button
+    private lateinit var btnErrorNext: Button
+    private lateinit var btnErrorClose: Button
 
     // Playlist & Buket Drawer
     private lateinit var playlistDrawer: View
@@ -103,12 +113,26 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     private lateinit var btnCloseQualitySheet: Button
 
     private var streamUrl: String = ""
-    private var streamHeaders: Map<String, String> = emptyMap()
+    private var activePlaybackUrl: String = ""
+    private var streamHeadersJson: String = "{}"
+    private var effectiveHeadersJson: String = "{}"
+    private var streamSubtitleUrl: String = ""
     private var currentTitle: String = "Media Station X (MPV)"
     private var currentPosSec: Double = 0.0
     private var durationSec: Double = 0.0
     private var isPaused: Boolean = false
     private var userSeeking: Boolean = false
+    private var retryCount: Int = 0
+    private var consumeNextUpKeyCode: Int = -1
+
+    private var resolvedOkRuQualities: List<OkRuQuality> = emptyList()
+    private var selectedOkRuUrl: String? = null
+
+    private val userAgents = listOf(
+        "VLC/3.0.20 LibVLC/3.0.20",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "IPTVSmartersPlayer"
+    )
 
     private var subFontSize: Int = 44
     private var subVerticalPos: Int = 94
@@ -119,8 +143,9 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     private lateinit var playlistAdapter: PlaylistAdapter
 
     private val uiHandler = Handler(Looper.getMainLooper())
+    private var pendingRetryRunnable: Runnable? = null
     private val hideOsdRunnable = Runnable {
-        if (!isAnySidePanelOpen()) {
+        if (!isAnySidePanelOpen() && errorPanel.visibility != View.VISIBLE) {
             osdOverlay.visibility = View.GONE
         }
     }
@@ -141,6 +166,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_mpv_player)
@@ -151,6 +177,8 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         loadSavedSubtitlePrefs()
 
         mpvView.listener = this
+        mpvView.isFocusable = false
+        mpvView.isFocusableInTouchMode = false
 
         val rawUrl = intent.getStringExtra(EXTRA_URL)
             ?: intent.dataString?.replaceFirst(Regex("^mpv://", RegexOption.IGNORE_CASE), "https://")
@@ -162,9 +190,9 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         }
 
         streamUrl = rawUrl
+        streamHeadersJson = intent.getStringExtra(EXTRA_HEADERS) ?: "{}"
+        streamSubtitleUrl = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
         currentTitle = intent.getStringExtra(EXTRA_TITLE) ?: "Media Station X (MPV)"
-        val subtitleUrl = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
-        streamHeaders = parseHeadersJson(intent.getStringExtra(EXTRA_HEADERS))
 
         initPlaylistData(intent.getStringExtra(EXTRA_PLAYLIST_JSON))
         setupControls()
@@ -176,15 +204,19 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         }
 
         titleText.text = currentTitle
-        mpvView.setOnClickListener {
-            if (isAnySidePanelOpen()) {
-                closeAllSidePanels()
-            } else {
-                toggleOsd()
+        mpvView.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                if (isAnySidePanelOpen()) {
+                    closeAllSidePanels()
+                } else {
+                    toggleOsd()
+                }
             }
+            true
         }
 
-        mpvView.play(streamUrl, subtitleUrl, startSec, streamHeaders)
+        bufferingBar.visibility = View.VISIBLE
+        playWithHeadersAndOkRu(streamUrl, streamSubtitleUrl, startSec)
         mpvView.postDelayed({
             mpvView.setSubtitleFontSize(subFontSize)
             mpvView.setSubtitleVerticalPos(subVerticalPos)
@@ -195,7 +227,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             loadM3uFromUrl(defaultM3u, silent = true)
         }
 
-        showOsd()
+        showOsd(focusPlayPause = true)
     }
 
     private fun bindViews() {
@@ -212,11 +244,19 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         btnPlayPause = findViewById(R.id.btn_play_pause)
         btnFf = findViewById(R.id.btn_forward)
         btnNext = findViewById(R.id.btn_next_item)
+        btnHwdec = findViewById(R.id.btn_hwdec)
+        btnSpeed = findViewById(R.id.btn_speed)
         btnPlaylist = findViewById(R.id.btn_playlist)
         btnQuality = findViewById(R.id.btn_quality)
         btnAudio = findViewById(R.id.btn_audio)
         btnSub = findViewById(R.id.btn_sub)
         btnClose = findViewById(R.id.btn_close_player)
+
+        errorPanel = findViewById(R.id.panel_error)
+        txtErrorDetail = findViewById(R.id.txt_error_detail)
+        btnErrorRetry = findViewById(R.id.btn_error_retry)
+        btnErrorNext = findViewById(R.id.btn_error_next)
+        btnErrorClose = findViewById(R.id.btn_error_close)
 
         playlistDrawer = findViewById(R.id.panel_playlist)
         bouquetContainer = findViewById(R.id.bouquet_container)
@@ -299,8 +339,10 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
                 isAllCaps = false
                 textSize = 12f
                 setBackgroundResource(
-                    if (group == activeBouquet) R.drawable.bg_player_focus else R.drawable.bg_player_pill
+                    if (group == activeBouquet) R.drawable.bg_player_focus else R.drawable.bg_player_button_selector
                 )
+                isFocusable = true
+                isFocusableInTouchMode = false
                 setTextColor(0xFFFFFFFF.toInt())
                 setPadding(24, 10, 24, 10)
                 setOnClickListener {
@@ -323,19 +365,91 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         playlistAdapter.submitList(visibleItems, streamUrl)
     }
 
+    private fun playWithHeadersAndOkRu(
+        targetUrl: String,
+        subtitleUrl: String,
+        startSec: Double,
+        forceUaOverride: String? = null
+    ) {
+        val baseResolved = HeaderRulesEngine.resolveForUrl(this, targetUrl, streamHeadersJson)
+        val shouldResolveOkRu = true && OkRuResolver.isOkRuUrl(targetUrl)
+
+        if (shouldResolveOkRu) {
+            groupBadgeText.text = "OK.ru Çözücü"
+            lifecycleScope.launch(Dispatchers.IO) {
+                val okResult = OkRuResolver.resolve(targetUrl, baseResolved.headersJson)
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    if (okResult != null) {
+                        resolvedOkRuQualities = okResult.qualities
+                        selectedOkRuUrl = okResult.bestUrl
+                        activePlaybackUrl = okResult.bestUrl
+                        val finalResolved = HeaderRulesEngine.resolveForUrl(
+                            this@MpvPlayerActivity,
+                            okResult.bestUrl,
+                            okResult.headersJson
+                        )
+                        effectiveHeadersJson = finalResolved.headersJson
+                        if (okResult.title.isNotBlank() && (currentTitle.startsWith("Media Station X") || currentTitle.all { it.isDigit() })) {
+                            currentTitle = okResult.title
+                            titleText.text = okResult.title
+                        }
+                        mpvView.play(
+                            url = okResult.bestUrl,
+                            subtitleUrl = subtitleUrl,
+                            startSec = startSec,
+                            headersJson = finalResolved.headersJson,
+                            userAgentOverride = forceUaOverride ?: finalResolved.userAgent
+                        )
+                    } else {
+                        resolvedOkRuQualities = emptyList()
+                        selectedOkRuUrl = null
+                        activePlaybackUrl = targetUrl
+                        effectiveHeadersJson = baseResolved.headersJson
+                        // Guvenlik agi: bilet URL (?h=okru&rid=...) basarisiz olursa sessizce orijinal bilet/proxy akisina don
+                        if (!OkRuResolver.isTicketUrl(targetUrl)) {
+                            Toast.makeText(this@MpvPlayerActivity, "OK.ru akışı doğrudan deneniyor", Toast.LENGTH_SHORT).show()
+                        }
+                        mpvView.play(targetUrl, subtitleUrl, startSec, baseResolved.headersJson, forceUaOverride ?: baseResolved.userAgent)
+                    }
+                }
+            }
+        } else {
+            resolvedOkRuQualities = emptyList()
+            selectedOkRuUrl = null
+            activePlaybackUrl = targetUrl
+            effectiveHeadersJson = baseResolved.headersJson
+            mpvView.play(
+                url = targetUrl,
+                subtitleUrl = subtitleUrl,
+                startSec = startSec,
+                headersJson = baseResolved.headersJson,
+                userAgentOverride = forceUaOverride ?: baseResolved.userAgent
+            )
+        }
+    }
+
     private fun switchToPlaylistItem(item: PlaylistItem) {
         saveResumePosition()
+        pendingRetryRunnable?.let { uiHandler.removeCallbacks(it) }
+        retryCount = 0
+        errorPanel.visibility = View.GONE
+        bufferingBar.visibility = View.VISIBLE
+
         streamUrl = item.url
+        streamSubtitleUrl = ""
         currentTitle = item.title
         currentPosSec = 0.0
         durationSec = 0.0
+        resolvedOkRuQualities = emptyList()
+        selectedOkRuUrl = null
         activePlaylistIndex = allPlaylistItems.indexOfFirst { it.url == item.url }.coerceAtLeast(0)
         titleText.text = item.title
         groupBadgeText.text = item.group
-        mpvView.play(item.url, headers = streamHeaders)
+        playWithHeadersAndOkRu(item.url, "", 0.0)
         refreshBouquetsAndList()
         closeAllSidePanels()
-        showOsd()
+        showOsd(focusPlayPause = true)
     }
 
     private fun switchByOffset(delta: Int) {
@@ -344,8 +458,33 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         switchToPlaylistItem(allPlaylistItems[nextIdx])
     }
 
+    private fun retryCurrentStream(manual: Boolean) {
+        pendingRetryRunnable?.let { uiHandler.removeCallbacks(it) }
+        if (manual) {
+            retryCount = 0
+        }
+        errorPanel.visibility = View.GONE
+        bufferingBar.visibility = View.VISIBLE
+        val ua = userAgents[retryCount.coerceIn(0, userAgents.lastIndex)]
+        val urlToPlay = selectedOkRuUrl ?: streamUrl
+        if (OkRuResolver.isOkRuUrl(streamUrl) && selectedOkRuUrl == null) {
+            playWithHeadersAndOkRu(streamUrl, streamSubtitleUrl, 0.0, ua)
+        } else {
+            val resolved = HeaderRulesEngine.resolveForUrl(this, urlToPlay, effectiveHeadersJson)
+            mpvView.play(urlToPlay, streamSubtitleUrl, 0.0, resolved.headersJson, ua)
+        }
+        showOsd(focusPlayPause = true)
+    }
+
     private fun setupControls() {
         btnClose.setOnClickListener { finishWithResult() }
+        btnErrorRetry.setOnClickListener { retryCurrentStream(manual = true) }
+        btnErrorNext.setOnClickListener {
+            if (allPlaylistItems.size > 1) switchByOffset(1)
+            else retryCurrentStream(manual = true)
+        }
+        btnErrorClose.setOnClickListener { finishWithResult() }
+
         btnPrev.setOnClickListener { switchByOffset(-1) }
         btnNext.setOnClickListener { switchByOffset(1) }
 
@@ -359,6 +498,16 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         }
         btnFf.setOnClickListener {
             mpvView.seekRelative(10)
+            resetOsdTimeout()
+        }
+        btnHwdec.setOnClickListener {
+            val modeLabel = mpvView.cycleHwdec()
+            btnHwdec.text = modeLabel
+            resetOsdTimeout()
+        }
+        btnSpeed.setOnClickListener {
+            val speed = mpvView.cycleSpeed()
+            btnSpeed.text = String.format(Locale.US, "%.2gx", speed)
             resetOsdTimeout()
         }
 
@@ -442,6 +591,10 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
                 if (fromUser && durationSec > 0) {
                     val target = (progress / 1000.0) * durationSec
                     timeText.text = "${formatSec(target)} / ${formatSec(durationSec)}"
+                    if (!userSeeking) {
+                        mpvView.seekAbsolute(target)
+                        resetOsdTimeout()
+                    }
                 }
             }
 
@@ -462,12 +615,31 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
 
     private fun populateQualityTracks() {
         qualityTrackContainer.removeAllViews()
+
+        if (resolvedOkRuQualities.isNotEmpty()) {
+            for (q in resolvedOkRuQualities) {
+                val isSelected = selectedOkRuUrl == q.url
+                addTrackOptionButton(
+                    container = qualityTrackContainer,
+                    label = q.label,
+                    selected = isSelected
+                ) {
+                    selectedOkRuUrl = q.url
+                    activePlaybackUrl = q.url
+                    bufferingBar.visibility = View.VISIBLE
+                    val resolved = HeaderRulesEngine.resolveForUrl(this, q.url, effectiveHeadersJson)
+                    mpvView.play(q.url, streamSubtitleUrl, currentPosSec, resolved.headersJson, resolved.userAgent)
+                    closeAllSidePanels()
+                }
+            }
+        }
+
         val videoTracks = mpvView.getTracks().filter { it.type == "video" }
 
         addTrackOptionButton(
             container = qualityTrackContainer,
             label = "Otomatik (Önerilen)",
-            selected = videoTracks.none { it.selected } || videoTracks.size <= 1
+            selected = resolvedOkRuQualities.isEmpty() && (videoTracks.none { it.selected } || videoTracks.size <= 1)
         ) {
             mpvView.selectVideoTrack(null)
             closeAllSidePanels()
@@ -479,7 +651,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             addTrackOptionButton(
                 container = qualityTrackContainer,
                 label = "$res$kbps",
-                selected = t.selected
+                selected = resolvedOkRuQualities.isEmpty() && t.selected
             ) {
                 mpvView.selectVideoTrack(t.id)
                 closeAllSidePanels()
@@ -557,8 +729,10 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             textSize = 13f
             gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             setPadding(28, 16, 28, 16)
+            isFocusable = true
+            isFocusableInTouchMode = false
             setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundResource(if (selected) R.drawable.bg_player_focus else R.drawable.bg_player_pill)
+            setBackgroundResource(if (selected) R.drawable.bg_player_focus else R.drawable.bg_player_button_selector)
             setOnClickListener { onClick() }
         }
         val lp = LinearLayout.LayoutParams(
@@ -637,8 +811,17 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
 
     private fun openOnlyPanel(panel: View) {
         closeAllSidePanels()
+        osdOverlay.visibility = View.VISIBLE
         panel.visibility = View.VISIBLE
         uiHandler.removeCallbacks(hideOsdRunnable)
+        panel.post {
+            when (panel.id) {
+                R.id.panel_playlist -> btnLoadM3u.requestFocus()
+                R.id.panel_subtitle -> btnSubSizeMinus.requestFocus()
+                R.id.panel_audio -> btnAddExtAudioFile.requestFocus()
+                R.id.panel_quality -> qualityTrackContainer.getChildAt(0)?.requestFocus() ?: btnCloseQualitySheet.requestFocus()
+            }
+        }
     }
 
     private fun closeAllSidePanels() {
@@ -646,6 +829,9 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         subtitleSheet.visibility = View.GONE
         audioSheet.visibility = View.GONE
         qualitySheet.visibility = View.GONE
+        if (osdOverlay.visibility == View.VISIBLE) {
+            btnPlayPause.post { btnPlayPause.requestFocus() }
+        }
         resetOsdTimeout()
     }
 
@@ -654,6 +840,37 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             subtitleSheet.visibility == View.VISIBLE ||
             audioSheet.visibility == View.VISIBLE ||
             qualitySheet.visibility == View.VISIBLE
+    }
+
+    private fun activeSidePanel(): View? = when {
+        playlistDrawer.visibility == View.VISIBLE -> playlistDrawer
+        subtitleSheet.visibility == View.VISIBLE -> subtitleSheet
+        audioSheet.visibility == View.VISIBLE -> audioSheet
+        qualitySheet.visibility == View.VISIBLE -> qualitySheet
+        else -> null
+    }
+
+    private fun isDescendantOf(child: View?, ancestor: View): Boolean {
+        var cur: Any? = child
+        while (cur is View) {
+            if (cur === ancestor) return true
+            cur = cur.parent
+        }
+        return false
+    }
+
+    private fun isLiveStreamUrl(): Boolean {
+        return durationSec <= 0.0 ||
+            streamUrl.contains("/live/", ignoreCase = true) ||
+            Regex("\\.(ts|m3u8)(\\?.*)?$", RegexOption.IGNORE_CASE).containsMatchIn(streamUrl)
+    }
+
+    override fun onFileLoaded() {
+        runOnUiThread {
+            retryCount = 0
+            bufferingBar.visibility = View.GONE
+            errorPanel.visibility = View.GONE
+        }
     }
 
     override fun onPropertyUpdate(property: String, value: Any?) {
@@ -694,139 +911,261 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
         }
     }
 
-    override fun onEndFile(reason: Int) {
+    override fun onEndFile(reason: Int, hadLoaded: Boolean) {
         runOnUiThread {
-            if (allPlaylistItems.size > 1 && activePlaylistIndex + 1 < allPlaylistItems.size) {
-                switchByOffset(1)
+            val isLive = isLiveStreamUrl()
+            val naturalVodEnd = hadLoaded && !isLive && durationSec > 10.0 && currentPosSec >= (durationSec - 5.0)
+            if (naturalVodEnd) {
+                if (allPlaylistItems.size > 1 && activePlaylistIndex + 1 < allPlaylistItems.size) {
+                    switchByOffset(1)
+                } else {
+                    finishWithResult()
+                }
+                return@runOnUiThread
+            }
+
+            // Canlı kanal (Xtream API / HTTP .ts) veya OK.ru akışı kopması: hemen MSX'e dönme, MPV içinde yeniden dene
+            if (retryCount < userAgents.size - 1) {
+                retryCount++
+                bufferingBar.visibility = View.VISIBLE
+                val nextUa = userAgents[retryCount]
+                val targetUrl = selectedOkRuUrl ?: streamUrl
+                Toast.makeText(this, "Yayın yeniden bağlanıyor (${retryCount}/2)...", Toast.LENGTH_SHORT).show()
+                pendingRetryRunnable?.let { uiHandler.removeCallbacks(it) }
+                val r = Runnable {
+                    if (!isFinishing && !isDestroyed) {
+                        val resolved = HeaderRulesEngine.resolveForUrl(this, targetUrl, effectiveHeadersJson)
+                        mpvView.play(targetUrl, streamSubtitleUrl, 0.0, resolved.headersJson, nextUa)
+                    }
+                }
+                pendingRetryRunnable = r
+                uiHandler.postDelayed(r, 900)
             } else {
-                finishWithResult()
+                bufferingBar.visibility = View.GONE
+                txtErrorDetail.text = "Yayın akışı açılamadı veya sunucu bağlantıyı kapattı.\n($currentTitle)"
+                errorPanel.visibility = View.VISIBLE
+                uiHandler.removeCallbacks(hideOsdRunnable)
+                btnErrorRetry.post { btnErrorRetry.requestFocus() }
             }
         }
     }
 
-    override fun onPlaybackError() {
-        // mpv could not open/keep playing this URL (network error, blocked by the
-        // CDN, missing headers, unsupported codec...). Previously this looked
-        // identical to a normal end-of-file and silently bounced back to MSX,
-        // which is confusing - show it and keep the player open instead.
-        runOnUiThread {
-            Toast.makeText(
-                this,
-                "Yayın açılamadı (ağ/URL hatası olabilir): $currentTitle",
-                Toast.LENGTH_LONG
-            ).show()
-            showOsd()
-        }
-    }
-
-    private fun parseHeadersJson(json: String?): Map<String, String> {
-        if (json.isNullOrBlank()) return emptyMap()
-        return try {
-            val obj = JSONObject(json)
-            val result = mutableMapOf<String, String>()
-            for (key in obj.keys()) {
-                result[key] = obj.getString(key)
-            }
-            result
-        } catch (_: Exception) {
-            emptyMap()
-        }
-    }
-
-    // TV remotes/kumanda fix: on-screen Buttons are focusable, so by default the
-    // D-pad arrows/center get eaten by Android's own focus-navigation between
-    // those buttons (moving focus or doing nothing visible) instead of ever
-    // reaching onKeyDown() on the Activity - that's why "kumanda çalışmıyor"
-    // (seek/play-pause/channel keys silently do nothing). Intercepting at
-    // dispatchKeyEvent runs before focus handling gets a chance to consume them.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val handledCodes = setOf(
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_MEDIA_REWIND,
-            KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-            KeyEvent.KEYCODE_CHANNEL_UP,
-            KeyEvent.KEYCODE_CHANNEL_DOWN,
-            KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_BACK
-        )
-        if (!isAnySidePanelOpen() && event.keyCode in handledCodes) {
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                onKeyDown(event.keyCode, event)
-            }
-            // Consume ACTION_UP too so it never falls through to the focused
-            // button's default click/focus-move behaviour.
-            return true
-        }
-        return super.dispatchKeyEvent(event)
-    }
+        val keyCode = event.keyCode
+        val isBackKey = keyCode == KeyEvent.KEYCODE_BACK ||
+            keyCode == KeyEvent.KEYCODE_ESCAPE ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_B
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (isAnySidePanelOpen()) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                closeAllSidePanels()
+        if (event.action == KeyEvent.ACTION_UP) {
+            if (keyCode == consumeNextUpKeyCode) {
+                consumeNextUpKeyCode = -1
                 return true
             }
-            return super.onKeyDown(keyCode, event)
+            return super.dispatchKeyEvent(event)
         }
 
-        showOsd()
-        return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                if (osdOverlay.visibility != View.VISIBLE) {
-                    showOsd()
-                } else {
-                    mpvView.togglePause()
-                }
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                mpvView.seekRelative(-10)
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                mpvView.seekRelative(10)
-                true
-            }
-            KeyEvent.KEYCODE_CHANNEL_UP -> {
-                switchByOffset(1)
-                true
-            }
-            KeyEvent.KEYCODE_CHANNEL_DOWN -> {
-                switchByOffset(-1)
-                true
-            }
-            KeyEvent.KEYCODE_MENU -> {
-                openOnlyPanel(playlistDrawer)
-                true
-            }
-            KeyEvent.KEYCODE_BACK -> {
-                finishWithResult()
-                true
-            }
-            else -> super.onKeyDown(keyCode, event)
+        if (event.action != KeyEvent.ACTION_DOWN) {
+            return super.dispatchKeyEvent(event)
         }
+
+        // 0. Hata / Yeniden Dene paneli açıkken
+        if (errorPanel.visibility == View.VISIBLE) {
+            if (isBackKey) {
+                consumeNextUpKeyCode = keyCode
+                finishWithResult()
+                return true
+            }
+            if (!isDescendantOf(currentFocus, errorPanel)) {
+                btnErrorRetry.requestFocus()
+            }
+            return super.dispatchKeyEvent(event)
+        }
+
+        // 1. Genel medya ve özel IPTV kumanda tuşları (HDMI-CEC, IR, Bluetooth)
+        when (keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
+                mpvView.togglePause()
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                mpvView.setPaused(false)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                mpvView.setPaused(true)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_BUTTON_L1 -> {
+                mpvView.seekRelative(-10)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_BUTTON_R1 -> {
+                mpvView.seekRelative(10)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> {
+                switchByOffset(1)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                switchByOffset(-1)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_STOP -> {
+                consumeNextUpKeyCode = keyCode
+                finishWithResult()
+                return true
+            }
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV,
+            KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_BUTTON_X -> {
+                if (playlistDrawer.visibility == View.VISIBLE) closeAllSidePanels()
+                else openOnlyPanel(playlistDrawer)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_GREEN -> {
+                if (qualitySheet.visibility == View.VISIBLE) closeAllSidePanels()
+                else { populateQualityTracks(); openOnlyPanel(qualitySheet) }
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK, KeyEvent.KEYCODE_PROG_YELLOW -> {
+                if (audioSheet.visibility == View.VISIBLE) closeAllSidePanels()
+                else { populateAudioTracks(); openOnlyPanel(audioSheet) }
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_CAPTIONS, KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_BUTTON_Y -> {
+                if (subtitleSheet.visibility == View.VISIBLE) closeAllSidePanels()
+                else { populateSubtitleTracks(); openOnlyPanel(subtitleSheet) }
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            KeyEvent.KEYCODE_INFO -> {
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+        }
+
+        // 2. Yan çekmece açıkken D-Pad sadece çekmece içinde gezinir; Back kapatır
+        val openPanel = activeSidePanel()
+        if (openPanel != null) {
+            if (isBackKey) {
+                closeAllSidePanels()
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            if (!isDescendantOf(currentFocus, openPanel)) {
+                openPanel.requestFocus()
+            }
+            return super.dispatchKeyEvent(event)
+        }
+
+        // 3. Ana OSD açıkken D-Pad butonlar arasında gezer ve tıklar
+        if (osdOverlay.visibility == View.VISIBLE) {
+            if (isBackKey) {
+                osdOverlay.visibility = View.GONE
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            resetOsdTimeout()
+            if (!isDescendantOf(currentFocus, osdOverlay)) {
+                btnPlayPause.requestFocus()
+                consumeNextUpKeyCode = keyCode
+                return true
+            }
+            return super.dispatchKeyEvent(event)
+        }
+
+        // 4. OSD gizliyken D-Pad hızlı sarma veya OSD uyandırma
+        return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                mpvView.seekRelative(-10)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                mpvView.seekRelative(10)
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                openOnlyPanel(playlistDrawer)
+                consumeNextUpKeyCode = keyCode
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+                showOsd(focusPlayPause = true)
+                consumeNextUpKeyCode = keyCode
+                true
+            }
+            else -> {
+                if (isBackKey) {
+                    consumeNextUpKeyCode = keyCode
+                    finishWithResult()
+                    true
+                } else {
+                    super.dispatchKeyEvent(event)
+                }
+            }
+        }
+    }
+
+    override fun onGenericMotionEvent(event: android.view.MotionEvent?): Boolean {
+        if (event != null && event.actionButton == android.view.MotionEvent.BUTTON_SECONDARY &&
+            event.action == android.view.MotionEvent.ACTION_BUTTON_PRESS
+        ) {
+            when {
+                isAnySidePanelOpen() -> closeAllSidePanels()
+                osdOverlay.visibility == View.VISIBLE -> osdOverlay.visibility = View.GONE
+                else -> finishWithResult()
+            }
+            return true
+        }
+        return super.onGenericMotionEvent(event)
     }
 
     private fun toggleOsd() {
         if (osdOverlay.visibility == View.VISIBLE) {
             osdOverlay.visibility = View.GONE
         } else {
-            showOsd()
+            showOsd(focusPlayPause = true)
         }
     }
 
-    private fun showOsd() {
+    private fun showOsd(focusPlayPause: Boolean = true) {
         osdOverlay.visibility = View.VISIBLE
+        if (focusPlayPause && !isAnySidePanelOpen() && errorPanel.visibility != View.VISIBLE) {
+            btnPlayPause.post {
+                if (osdOverlay.visibility == View.VISIBLE && !isAnySidePanelOpen() && errorPanel.visibility != View.VISIBLE) {
+                    if (!isDescendantOf(currentFocus, osdOverlay)) {
+                        btnPlayPause.requestFocus()
+                    }
+                }
+            }
+        }
         resetOsdTimeout()
     }
 
     private fun resetOsdTimeout() {
         uiHandler.removeCallbacks(hideOsdRunnable)
-        uiHandler.postDelayed(hideOsdRunnable, 4000)
+        uiHandler.postDelayed(hideOsdRunnable, 5000)
     }
 
     private fun saveResumePosition() {
@@ -839,6 +1178,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     }
 
     private fun finishWithResult() {
+        pendingRetryRunnable?.let { uiHandler.removeCallbacks(it) }
         saveResumePosition()
         val resultIntent = Intent().apply {
             putExtra(EXTRA_URL, streamUrl)
@@ -850,6 +1190,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
     }
 
     override fun onDestroy() {
+        pendingRetryRunnable?.let { uiHandler.removeCallbacks(it) }
         uiHandler.removeCallbacks(hideOsdRunnable)
         mpvView.releasePlayer()
         super.onDestroy()
@@ -897,7 +1238,7 @@ class MpvPlayerActivity : AppCompatActivity(), MpvView.Listener {
             holder.title.text = item.title
             holder.group.text = item.group
             holder.itemView.setBackgroundResource(
-                if (isActive) R.drawable.bg_player_focus else R.drawable.bg_player_pill
+                if (isActive) R.drawable.bg_player_focus else R.drawable.bg_player_button_selector
             )
             holder.itemView.setOnClickListener { onItemClick(item) }
         }

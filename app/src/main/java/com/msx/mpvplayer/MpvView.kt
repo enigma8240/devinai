@@ -5,7 +5,7 @@ import android.util.AttributeSet
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import `is`.xyz.mpv.MPVLib
-import `is`.xyz.mpv.MPVNode
+import org.json.JSONObject
 import java.io.File
 
 class MpvView @JvmOverloads constructor(
@@ -14,15 +14,20 @@ class MpvView @JvmOverloads constructor(
 ) : SurfaceView(context, attrs), SurfaceHolder.Callback {
 
     private var initialized = false
+    private var hasActivePlayback = false
+    private var hasFileLoaded = false
+    private var isReplacingFile = false
+
     private var pendingUrl: String? = null
     private var pendingSubtitle: String? = null
     private var pendingStartSec: Double = 0.0
-    private var pendingHeaders: Map<String, String> = emptyMap()
+    private var pendingHeadersJson: String = "{}"
+    private var pendingUserAgent: String = "VLC/3.0.20 LibVLC/3.0.20"
 
     interface Listener {
         fun onPropertyUpdate(property: String, value: Any?)
-        fun onEndFile(reason: Int)
-        fun onPlaybackError()
+        fun onFileLoaded()
+        fun onEndFile(reason: Int, hadLoaded: Boolean)
         fun onTracksChanged()
     }
 
@@ -40,6 +45,11 @@ class MpvView @JvmOverloads constructor(
         }
 
         override fun eventProperty(property: String, value: Double) {
+            if (property == "time-pos" && value > 0.2 && !hasFileLoaded) {
+                hasFileLoaded = true
+                isReplacingFile = false
+                listener?.onFileLoaded()
+            }
             listener?.onPropertyUpdate(property, value)
         }
 
@@ -54,31 +64,28 @@ class MpvView @JvmOverloads constructor(
             }
         }
 
-        override fun eventProperty(property: String, value: MPVNode) {
-            // Node-typed property updates aren't needed by this UI; ignore.
-        }
-
         override fun event(eventId: Int) {
-            if (eventId == MPVLib.mpvEventId.MPV_EVENT_END_FILE) {
-                // mpv fires END_FILE both for a real finished/stopped playback AND for an
-                // immediate open/network/codec failure. Without telling these apart, any
-                // failed stream (wrong headers, blocked by the CDN, etc.) looked exactly
-                // like "mpv opens then instantly bounces back to MSX" - which is exactly
-                // what was reported for Xtream streams. "eof-reached" is false on a real
-                // failure, so use it to only auto-advance/close on genuine completion.
-                val reachedEof = MPVLib.getPropertyBoolean("eof-reached") == true
-                if (reachedEof) {
-                    listener?.onEndFile(eventId)
-                } else {
-                    listener?.onPlaybackError()
-                }
-            } else if (eventId == MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED) {
+            if (eventId == MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED) {
+                isReplacingFile = false
+                hasFileLoaded = true
+                listener?.onFileLoaded()
                 listener?.onTracksChanged()
+            } else if (eventId == MPVLib.mpvEventId.MPV_EVENT_END_FILE) {
+                if (isReplacingFile) {
+                    isReplacingFile = false
+                    return
+                }
+                val loaded = hasFileLoaded
+                hasActivePlayback = false
+                hasFileLoaded = false
+                listener?.onEndFile(eventId, loaded)
             }
         }
     }
 
     init {
+        isFocusable = false
+        isFocusableInTouchMode = false
         holder.addCallback(this)
     }
 
@@ -98,6 +105,8 @@ class MpvView @JvmOverloads constructor(
         MPVLib.setOptionString("ao", "audiotrack")
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
+        MPVLib.setOptionString("stream-lavf-o", "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5")
+        MPVLib.setOptionString("tls-verify", "no")
         MPVLib.init()
 
         MPVLib.addObserver(observer)
@@ -107,59 +116,137 @@ class MpvView @JvmOverloads constructor(
         MPVLib.observeProperty("paused-for-cache", MPVLib.mpvFormat.MPV_FORMAT_FLAG)
         MPVLib.observeProperty("track-list", MPVLib.mpvFormat.MPV_FORMAT_STRING)
 
+        HeaderRulesEngine.prefetchRemoteRulesAsync()
         initialized = true
     }
 
-    fun play(url: String, subtitleUrl: String = "", startSec: Double = 0.0, headers: Map<String, String> = emptyMap()) {
+    fun play(
+        url: String,
+        subtitleUrl: String = "",
+        startSec: Double = 0.0,
+        headersJson: String = "{}",
+        userAgentOverride: String = "VLC/3.0.20 LibVLC/3.0.20"
+    ) {
         pendingUrl = url
         pendingSubtitle = subtitleUrl
         pendingStartSec = startSec
-        pendingHeaders = headers
+        pendingHeadersJson = headersJson
+        pendingUserAgent = userAgentOverride
         if (holder.surface?.isValid == true) {
             startPlaybackInternal()
         }
     }
 
+    private var currentHwdecMode: String = "auto-safe"
+    private var currentSpeedIndex: Int = 0
+    private val speedSteps = listOf(1.0, 1.25, 1.5, 2.0, 0.75)
+
     private fun startPlaybackInternal() {
         val url = pendingUrl ?: return
         initializeIfNeeded()
-        // Many Xtream/IPTV panels put a Referer (and sometimes User-Agent) check in
-        // front of the stream; a plain <video> tag sends these from the browser
-        // automatically, but mpv does not unless told to. Without this, a stream
-        // that the WebView could play can be refused/closed instantly by mpv.
-        if (pendingHeaders.isEmpty()) {
-            MPVLib.setOptionString("http-header-fields", "")
-        } else {
-            // mpv string-list options separate items with "," and expect a literal
-            // comma inside an item to be escaped by doubling it ("," -> ",,") - a
-            // User-Agent string ("... (KHTML, like Gecko) ...") has exactly that,
-            // so this must be escaped or mpv misparses the whole option.
-            val headerStr = pendingHeaders.entries.joinToString(",") { (k, v) ->
-                "$k: $v".replace(",", ",,")
-            }
-            MPVLib.setOptionString("http-header-fields", headerStr)
+
+        isReplacingFile = hasActivePlayback
+        hasActivePlayback = true
+        hasFileLoaded = false
+
+        val isHttpTs = url.startsWith("http://", ignoreCase = true) &&
+            (url.contains(".ts", ignoreCase = true) || url.contains("/live/", ignoreCase = true))
+        if (isHttpTs) {
+            MPVLib.setOptionString("hls-bitrate", "max")
+            MPVLib.setOptionString("demuxer-lavf-o", "fflags=+discardcorrupt+genpts")
         }
+
+        val ua = pendingUserAgent.ifBlank { "VLC/3.0.20 LibVLC/3.0.20" }
+        MPVLib.setOptionString("user-agent", ua)
+        applyPerUrlHeaders(url, pendingHeadersJson, ua)
         MPVLib.setOptionString("start", if (pendingStartSec > 1.0) pendingStartSec.toString() else "0")
-        MPVLib.command("loadfile", url, "replace")
+        MPVLib.command(arrayOf("loadfile", url, "replace"))
         if (!pendingSubtitle.isNullOrBlank()) {
-            MPVLib.command("sub-add", pendingSubtitle!!, "select")
+            MPVLib.command(arrayOf("sub-add", pendingSubtitle!!, "select"))
         }
         pendingUrl = null
     }
 
+    private fun applyPerUrlHeaders(targetUrl: String, headersJson: String, effectiveUa: String) {
+        try {
+            val obj = JSONObject(headersJson)
+            val fields = mutableListOf<String>()
+            var explicitUa = ""
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.optString(key, "").trim()
+                if (key.isNotBlank() && value.isNotBlank()) {
+                    if (key.equals("User-Agent", ignoreCase = true)) {
+                        explicitUa = value
+                    } else {
+                        fields.add("$key: $value")
+                    }
+                }
+            }
+
+            // okcdn.ru / mycdn.me / ok.ru / h=okru guvenlik kurali (Referer global sızmasin diye file-local-options kullanilir)
+            val needsOkRuReferer = targetUrl.contains("okcdn.ru", ignoreCase = true) ||
+                targetUrl.contains("mycdn.me", ignoreCase = true) ||
+                targetUrl.contains("ok.ru", ignoreCase = true) ||
+                targetUrl.contains("h=okru", ignoreCase = true)
+            if (needsOkRuReferer && fields.none { it.startsWith("Referer:", ignoreCase = true) }) {
+                fields.add("Referer: https://ok.ru/")
+            }
+
+            val uaToUse = explicitUa.ifBlank { effectiveUa }
+            if (uaToUse.isNotBlank()) {
+                MPVLib.setPropertyString("file-local-options/user-agent", uaToUse)
+            }
+            MPVLib.setOptionString("referrer", "")
+            MPVLib.setPropertyString("file-local-options/http-header-fields", fields.joinToString(","))
+        } catch (_: Exception) {
+            MPVLib.setPropertyString("file-local-options/http-header-fields", "")
+        }
+    }
+
+    fun cycleHwdec(): String {
+        val modes = listOf("auto-safe", "mediacodec", "mediacodec-copy", "no")
+        val nextIdx = (modes.indexOf(currentHwdecMode) + 1) % modes.size
+        currentHwdecMode = modes[nextIdx]
+        if (initialized) {
+            MPVLib.setPropertyString("hwdec", currentHwdecMode)
+        }
+        return when (currentHwdecMode) {
+            "no" -> "SW"
+            "mediacodec-copy" -> "HW+"
+            "mediacodec" -> "HW"
+            else -> "AUTO"
+        }
+    }
+
+    fun cycleSpeed(): Double {
+        currentSpeedIndex = (currentSpeedIndex + 1) % speedSteps.size
+        val nextSpeed = speedSteps[currentSpeedIndex]
+        if (initialized) {
+            MPVLib.setPropertyString("speed", nextSpeed.toString())
+        }
+        return nextSpeed
+    }
+
     fun togglePause() {
         if (!initialized) return
-        MPVLib.command("cycle", "pause")
+        MPVLib.command(arrayOf("cycle", "pause"))
+    }
+
+    fun setPaused(paused: Boolean) {
+        if (!initialized) return
+        MPVLib.setPropertyBoolean("pause", paused)
     }
 
     fun seekRelative(seconds: Int) {
         if (!initialized) return
-        MPVLib.command("seek", seconds.toString(), "relative")
+        MPVLib.command(arrayOf("seek", seconds.toString(), "relative"))
     }
 
     fun seekAbsolute(seconds: Double) {
         if (!initialized) return
-        MPVLib.command("seek", seconds.toString(), "absolute")
+        MPVLib.command(arrayOf("seek", seconds.toString(), "absolute"))
     }
 
     fun getTracks(): List<MpvTrackInfo> {
@@ -195,12 +282,12 @@ class MpvView @JvmOverloads constructor(
 
     fun addExternalSubtitle(pathOrUrl: String) {
         if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command("sub-add", pathOrUrl, "select")
+        MPVLib.command(arrayOf("sub-add", pathOrUrl, "select"))
     }
 
     fun addExternalAudioTrack(pathOrUrl: String) {
         if (!initialized || pathOrUrl.isBlank()) return
-        MPVLib.command("audio-add", pathOrUrl, "select")
+        MPVLib.command(arrayOf("audio-add", pathOrUrl, "select"))
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {

@@ -5,9 +5,6 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -22,16 +19,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK lisanslarini kabul et
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+      - name: Android SDK kur
+        uses: android-actions/setup-android@v3
 
-      - name: Gradle 8.7 kur
+      - name: Gradle 8.7 ile APK derle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-
-      - name: APK derle
-        run: gradle assembleDebug assembleRelease
+          arguments: assembleDebug assembleRelease
 
       - name: Debug APK Yükle
         uses: actions/upload-artifact@v4
@@ -44,13 +39,3 @@ jobs:
         with:
           name: msx-mpv-release-apk
           path: app/build/outputs/apk/release/*.apk
-
-      - name: GitHub Release olarak yayinla (kolay indirme icin)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "build-${{ github.run_number }}" \
-            app/build/outputs/apk/debug/*.apk \
-            app/build/outputs/apk/release/*.apk \
-            --title "MSX MPV Player - build #${{ github.run_number }}" \
-            --notes "Otomatik derleme. Commit: ${{ github.sha }}"

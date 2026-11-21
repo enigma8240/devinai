@@ -1,6 +1,7 @@
 package com.msx.mpvplayer
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -13,26 +14,38 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
+import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val PREFS_MSX = "msx_host_prefs"
+        private const val KEY_CUSTOM_START = "custom_start_param"
+    }
+
     private lateinit var webView: WebView
-    private val msxEntryUrl = "https://msx.benzac.de/"
+    private val defaultMsxBase = "https://msx.benzac.de/"
+    private val defaultMsxEntryUrl = "https://msx.benzac.de/"
 
     private val mediaExtensionRegex = Regex(
-        "\\.(mkv|mp4|m3u8|m3u|mpd|ts|avi|mov|webm|flv|wmv|m4v)(\\?.*)?$",
+        "(\\.(mkv|mp4|m3u8|m3u|mpd|ts|avi|mov|webm|flv|wmv|m4v)(\\?.*)?$)|(/+(live|movie|series)/[^/]+/[^/]+/\\d+)|([?&](output|type)=m?peg?ts\\b)|(https?://(?:m\\.|www\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|live)/\\d+)",
         RegexOption.IGNORE_CASE
     )
 
     private val mpvLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        webView.requestFocus()
         val data = result.data ?: return@registerForActivityResult
         val url = data.getStringExtra(MpvPlayerActivity.EXTRA_URL) ?: return@registerForActivityResult
         val pos = data.getDoubleExtra(MpvPlayerActivity.EXTRA_POSITION, 0.0)
@@ -52,14 +65,22 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableImmersiveMode()
+        HeaderRulesEngine.prefetchRemoteRulesAsync()
 
         webView = findViewById(R.id.msx_webview)
         webView.setBackgroundColor(Color.BLACK)
+        webView.requestFocus()
+
+        findViewById<Button>(R.id.btn_msx_start_param).setOnClickListener {
+            showStartParameterDialog()
+        }
 
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
+        settings.allowFileAccess = true
+        settings.allowContentAccess = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.useWideViewPort = true
@@ -85,22 +106,88 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (savedInstanceState != null) {
+        val deepLinkStart = extractStartFromIntent(intent)
+        if (!deepLinkStart.isNullOrBlank()) {
+            saveCustomStartParam(deepLinkStart)
+            webView.loadUrl(buildMsxUrl(deepLinkStart))
+        } else if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
-            webView.loadUrl(msxEntryUrl)
+            val savedStart = getSharedPreferences(PREFS_MSX, Context.MODE_PRIVATE)
+                .getString(KEY_CUSTOM_START, null)
+            val initialUrl = if (!savedStart.isNullOrBlank()) buildMsxUrl(savedStart) else defaultMsxEntryUrl
+            webView.loadUrl(initialUrl)
         }
     }
 
-    /**
-     * Default Referer for anything we launch mpv for ourselves (not already
-     * carrying its own headersJson from the JS hook). Many Xtream/IPTV CDNs
-     * reject requests with no/wrong Referer - the WebView's own page sends
-     * its own URL as Referer automatically, mpv does not unless told to.
-     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val deepLinkStart = extractStartFromIntent(intent)
+        if (!deepLinkStart.isNullOrBlank()) {
+            saveCustomStartParam(deepLinkStart)
+            webView.loadUrl(buildMsxUrl(deepLinkStart))
+        }
+    }
+
+    private fun extractStartFromIntent(intent: Intent?): String? {
+        val data = intent?.data ?: return null
+        if (data.scheme?.equals("msx", ignoreCase = true) == true) {
+            return data.toString().removePrefix("msx://").trim()
+        }
+        return intent.getStringExtra("start")
+    }
+
+    private fun buildMsxUrl(input: String): String {
+        val clean = input.trim()
+        if (clean.isBlank()) return defaultMsxEntryUrl
+        if (clean.contains("msx.benzac.de", ignoreCase = true)) {
+            return clean
+        }
+        val base = defaultMsxBase.trimEnd('/')
+        val sep = if (base.contains("?")) "&" else "?"
+        return "$base${sep}start=" + URLEncoder.encode(clean, "UTF-8")
+    }
+
+    private fun saveCustomStartParam(value: String) {
+        getSharedPreferences(PREFS_MSX, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CUSTOM_START, value.trim())
+            .apply()
+    }
+
+    private fun showStartParameterDialog() {
+        val prefs = getSharedPreferences(PREFS_MSX, Context.MODE_PRIVATE)
+        val current = prefs.getString(KEY_CUSTOM_START, "") ?: ""
+        val input = EditText(this).apply {
+            hint = "Örn: msx.example.com veya http://192.168.1.50/start.json"
+            setText(current)
+            setSingleLine(true)
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 8)
+            addView(input)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("MSX Start Parameter / Adres")
+            .setMessage("MSX sunucu adresini veya start.json bağlantısını girin:")
+            .setView(container)
+            .setPositiveButton("Bağlan") { _, _ ->
+                val entered = input.text.toString().trim()
+                saveCustomStartParam(entered)
+                webView.loadUrl(buildMsxUrl(entered))
+            }
+            .setNeutralButton("Varsayılan") { _, _ ->
+                saveCustomStartParam("")
+                webView.loadUrl(defaultMsxEntryUrl)
+            }
+            .setNegativeButton("İptal", null)
+            .show()
+    }
+
     private fun defaultHeadersJson(): String {
-        val referer = webView.url ?: msxEntryUrl
-        return JSONObject().put("Referer", referer).toString()
+        return "{}"
     }
 
     private fun handleInterceptedUri(uri: Uri): Boolean {
@@ -125,7 +212,15 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {}
         }
 
-        if (true && mediaExtensionRegex.containsMatchIn(urlStr)) {
+        val shouldForceHttpTs = true &&
+            Regex("(^http://.*\\.ts(\\?.*)?$)|([?&](output|type)=m?peg?ts\\b)", RegexOption.IGNORE_CASE).containsMatchIn(urlStr)
+
+        val isOkRu = true && OkRuResolver.isOkRuUrl(urlStr)
+
+        if ((true && mediaExtensionRegex.containsMatchIn(urlStr)) ||
+            shouldForceHttpTs ||
+            isOkRu
+        ) {
             launchMpvPlayer(urlStr, uri.lastPathSegment ?: "Media Station X", defaultHeadersJson(), "", 0L, "[]")
             return true
         }
@@ -138,6 +233,10 @@ class MainActivity : AppCompatActivity() {
             val js = assets.open("msx-mpv-hook.js").bufferedReader().use { it.readText() }
             webView.evaluateJavascript(js, null)
         } catch (_: Exception) {}
+        try {
+            val externalMsxJs = assets.open("msx.js").bufferedReader().use { it.readText() }
+            webView.evaluateJavascript(externalMsxJs, null)
+        } catch (_: Exception) {}
     }
 
     fun launchMpvPlayer(
@@ -148,10 +247,11 @@ class MainActivity : AppCompatActivity() {
         startPositionMs: Long,
         playlistJson: String
     ) {
+        val resolved = HeaderRulesEngine.resolveForUrl(this, url, headersJson)
         val intent = Intent(this, MpvPlayerActivity::class.java).apply {
             putExtra(MpvPlayerActivity.EXTRA_URL, url)
             putExtra(MpvPlayerActivity.EXTRA_TITLE, title)
-            putExtra(MpvPlayerActivity.EXTRA_HEADERS, headersJson)
+            putExtra(MpvPlayerActivity.EXTRA_HEADERS, resolved.headersJson)
             putExtra(MpvPlayerActivity.EXTRA_SUBTITLE, subtitleUrl)
             putExtra(MpvPlayerActivity.EXTRA_START_POS_MS, startPositionMs)
             putExtra(MpvPlayerActivity.EXTRA_PLAYLIST_JSON, playlistJson)
@@ -185,10 +285,36 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+
+        @JavascriptInterface
+        fun setHeaderRules(rulesJson: String?) {
+            HeaderRulesEngine.saveExternalRulesJson(applicationContext, rulesJson)
+        }
+
+        @JavascriptInterface
+        fun addHeaderRule(pattern: String?, headersJson: String?) {
+            if (!pattern.isNullOrBlank()) {
+                HeaderRulesEngine.addOrUpdateRule(applicationContext, pattern, headersJson ?: "{}")
+            }
+        }
+
+        @JavascriptInterface
+        fun getHeaderRules(): String {
+            return HeaderRulesEngine.getExternalRulesJson(applicationContext)
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
+        if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_GUIDE ||
+            keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_PROG_RED
+        ) {
+            showStartParameterDialog()
+            return true
+        }
+        val isBackKey = keyCode == KeyEvent.KEYCODE_BACK ||
+            keyCode == KeyEvent.KEYCODE_ESCAPE ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_B
+        if (isBackKey && webView.canGoBack()) {
             webView.goBack()
             return true
         }
