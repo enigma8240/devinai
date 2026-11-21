@@ -25,6 +25,103 @@ data class MpvTrackInfo(
     val external: Boolean
 )
 
+data class StreamQualityVariant(
+    val label: String,
+    val meta: String,
+    val url: String,
+    val height: Int,
+    val bandwidth: Long
+)
+
+object HlsQualityParser {
+
+    fun fetchVariants(m3u8Url: String, headersJson: String = "{}"): List<StreamQualityVariant> {
+        if (!m3u8Url.contains(".m3u8", ignoreCase = true) && !m3u8Url.contains("m3u8", ignoreCase = true)) {
+            return emptyList()
+        }
+        return try {
+            val conn = (URL(m3u8Url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 6_000
+                readTimeout = 8_000
+                requestMethod = "GET"
+                instanceFollowRedirects = true
+                try {
+                    val obj = org.json.JSONObject(headersJson)
+                    val keys = obj.keys()
+                    while (keys.hasNext()) {
+                        val k = keys.next()
+                        val v = obj.optString(k, "")
+                        if (k.isNotBlank() && v.isNotBlank()) setRequestProperty(k, v)
+                    }
+                } catch (_: Exception) {}
+            }
+            if (conn.responseCode !in 200..399) return emptyList()
+            val body = conn.inputStream.use { BufferedReader(InputStreamReader(it)).readText() }
+            if (!body.contains("#EXT-X-STREAM-INF", ignoreCase = true)) return emptyList()
+
+            val base = URL(m3u8Url)
+            val lines = body.lines()
+            val variants = mutableListOf<StreamQualityVariant>()
+            val bwRegex = Regex("BANDWIDTH=(\\d+)", RegexOption.IGNORE_CASE)
+            val resRegex = Regex("RESOLUTION=(\\d+)x(\\d+)", RegexOption.IGNORE_CASE)
+            val nameRegex = Regex("NAME=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+
+            var i = 0
+            while (i < lines.size) {
+                val line = lines[i].trim()
+                if (line.startsWith("#EXT-X-STREAM-INF", ignoreCase = true)) {
+                    var nextUrl = ""
+                    var j = i + 1
+                    while (j < lines.size) {
+                        val cand = lines[j].trim()
+                        if (cand.isNotEmpty() && !cand.startsWith("#")) {
+                            nextUrl = cand
+                            break
+                        }
+                        j++
+                    }
+                    if (nextUrl.isNotBlank()) {
+                        val resolvedUrl = URL(base, nextUrl).toString()
+                        val bw = bwRegex.find(line)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+                        val resMatch = resRegex.find(line)
+                        val w = resMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+                        val h = resMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+                        val rawName = nameRegex.find(line)?.groupValues?.getOrNull(1).orEmpty()
+                        val label = when {
+                            h >= 2160 -> "2160p 4K UHD"
+                            h >= 1440 -> "1440p QHD"
+                            h > 0 -> "${h}p"
+                            rawName.isNotBlank() -> rawName
+                            bw > 0 -> "${bw / 1000} kbps"
+                            else -> "Varyant #${variants.size + 1}"
+                        }
+                        val metaParts = listOfNotNull(
+                            if (w > 0 && h > 0) "${w}x${h}" else null,
+                            if (bw > 0) "${bw / 1000} kbps" else null
+                        )
+                        variants.add(
+                            StreamQualityVariant(
+                                label = label,
+                                meta = metaParts.joinToString(" · "),
+                                url = resolvedUrl,
+                                height = h,
+                                bandwidth = bw
+                            )
+                        )
+                    }
+                    i = j
+                }
+                i++
+            }
+            variants.distinctBy { it.url }.sortedWith(
+                compareByDescending<StreamQualityVariant> { it.height }.thenByDescending { it.bandwidth }
+            )
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+}
+
 object PlaylistParser {
 
     fun parseJson(jsonStr: String?): List<PlaylistItem> {

@@ -263,6 +263,17 @@ class MpvView @JvmOverloads constructor(
         return PlaylistParser.parseMpvTrackList(raw)
     }
 
+    private var currentHlsBitrateLimit: String = "max"
+
+    fun setHlsBitrateLimit(limit: String) {
+        currentHlsBitrateLimit = limit
+        if (initialized) {
+            MPVLib.setPropertyString("hls-bitrate", limit)
+        }
+    }
+
+    fun getHlsBitrateLimit(): String = currentHlsBitrateLimit
+
     fun selectVideoTrack(trackId: Int?) {
         if (!initialized) return
         MPVLib.setPropertyString("vid", trackId?.toString() ?: "auto")

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
@@ -17,6 +18,7 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var webView: WebView
+    private var lastPlayerReturnMs: Long = 0L
     private val defaultMsxBase = "https://msx.benzac.de/"
     private val defaultMsxEntryUrl = "https://msx.benzac.de/"
 
@@ -45,7 +48,8 @@ class MainActivity : AppCompatActivity() {
     private val mpvLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        webView.requestFocus()
+        lastPlayerReturnMs = SystemClock.uptimeMillis()
+        webView.post { webView.requestFocus() }
         val data = result.data ?: return@registerForActivityResult
         val url = data.getStringExtra(MpvPlayerActivity.EXTRA_URL) ?: return@registerForActivityResult
         val pos = data.getDoubleExtra(MpvPlayerActivity.EXTRA_POSITION, 0.0)
@@ -90,7 +94,11 @@ class MainActivity : AppCompatActivity() {
 
         webView.addJavascriptInterface(MsxBridge(), "MsxMpvBridge")
 
-        webView.webChromeClient = object : WebChromeClient() {}
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onCloseWindow(window: WebView?) {
+                finish()
+            }
+        }
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
@@ -106,6 +114,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                handleMsxBackNavigation(isLongPress = false)
+            }
+        })
+
         val deepLinkStart = extractStartFromIntent(intent)
         if (!deepLinkStart.isNullOrBlank()) {
             saveCustomStartParam(deepLinkStart)
@@ -118,6 +132,11 @@ class MainActivity : AppCompatActivity() {
             val initialUrl = if (!savedStart.isNullOrBlank()) buildMsxUrl(savedStart) else defaultMsxEntryUrl
             webView.loadUrl(initialUrl)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.post { webView.requestFocus() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -302,6 +321,70 @@ class MainActivity : AppCompatActivity() {
         fun getHeaderRules(): String {
             return HeaderRulesEngine.getExternalRulesJson(applicationContext)
         }
+
+        @JavascriptInterface
+        fun exitApp() {
+            runOnUiThread { finish() }
+        }
+    }
+
+    private fun handleMsxBackNavigation(isLongPress: Boolean) {
+        if (SystemClock.uptimeMillis() - lastPlayerReturnMs < 900L) {
+            return
+        }
+        if (isLongPress) {
+            showExitConfirmDialog()
+            return
+        }
+        if (webView.canGoBack()) {
+            webView.goBack()
+            return
+        }
+        dispatchMsxBackToWebView()
+    }
+
+    private fun dispatchMsxBackToWebView() {
+        val js = """
+            (function(){
+              try {
+                var active = document.activeElement || document.body;
+                var opts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+                active.dispatchEvent(new KeyboardEvent('keydown', opts));
+                window.dispatchEvent(new KeyboardEvent('keydown', opts));
+                active.dispatchEvent(new KeyboardEvent('keyup', opts));
+                if (window.TVXInteractionPlugin && typeof window.TVXInteractionPlugin.executeAction === 'function') {
+                  window.TVXInteractionPlugin.executeAction('back');
+                }
+              } catch(e) {}
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+    }
+
+    private fun showExitConfirmDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Uygulamadan Çık")
+            .setMessage("MSX MPV oynatıcıdan tamamen çıkmak istiyor musunuz?")
+            .setPositiveButton("Çık") { _, _ -> finish() }
+            .setNegativeButton("MSX'te Kal", null)
+            .show()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        val isBackKey = keyCode == KeyEvent.KEYCODE_BACK ||
+            keyCode == KeyEvent.KEYCODE_ESCAPE ||
+            keyCode == KeyEvent.KEYCODE_BUTTON_B
+        if (isBackKey) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                val isLongPress = event.isLongPress || event.repeatCount >= 6
+                if (event.repeatCount == 0 || isLongPress) {
+                    handleMsxBackNavigation(isLongPress)
+                }
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -309,13 +392,6 @@ class MainActivity : AppCompatActivity() {
             keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_PROG_RED
         ) {
             showStartParameterDialog()
-            return true
-        }
-        val isBackKey = keyCode == KeyEvent.KEYCODE_BACK ||
-            keyCode == KeyEvent.KEYCODE_ESCAPE ||
-            keyCode == KeyEvent.KEYCODE_BUTTON_B
-        if (isBackKey && webView.canGoBack()) {
-            webView.goBack()
             return true
         }
         return super.onKeyDown(keyCode, event)
