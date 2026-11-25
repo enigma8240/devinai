@@ -59,7 +59,13 @@ jobs:
       - name: Rename output
         run: |
           mkdir -p dist
-          cp signed-out/app-unsigned-aligned-signed.apk dist/mpv-lite.apk
+          # uber-apk-signer surume gore "-unsigned" onekini cikis dosya adindan
+          # silebiliyor (orn. app-unsigned.apk -> app-aligned-signed.apk, "app-
+          # unsigned-aligned-signed.apk" DEGIL) - sabit isim yerine signed-out/
+          # icindeki TEK apk'yi (joker karakterle) kullaniyoruz, boylece surum
+          # farkina dayanikli.
+          ls -la signed-out/
+          cp signed-out/*-aligned-signed.apk dist/mpv-lite.apk
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
