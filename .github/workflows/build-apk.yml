@@ -14,6 +14,13 @@ on:
       - ".github/workflows/build-apk.yml"
   workflow_dispatch: {}
 
+# "Create GitHub Release" adimi varsayilan GITHUB_TOKEN ile release
+# OLUSTURAMIYORDU ("Resource not accessible by integration") - repo'nun
+# Actions ayari varsayilan olarak salt-okunur izin veriyor olabilir. Bu
+# workflow'a ozel, acikca "contents: write" izni veriyoruz.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
