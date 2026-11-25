@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <is.xyz.mpv.preferences.ScalerDialogPreference android:title="@string/pref_video_upscale_title"
+                        android:key="video_scale"
+                        android:summary=""
+                        newenigmahd:entries="@array/scaler_list"
+                        newenigmahd:iconSpaceReserved="false" />
+  <is.xyz.mpv.preferences.ScalerDialogPreference android:title="@string/pref_video_downscale_title"
+                        android:key="video_downscale"
+                        android:summary=""
+                        newenigmahd:entries="@array/scaler_list"
+                        newenigmahd:iconSpaceReserved="false" />
+  <ListPreference android:entries="@array/deband_entries"
+                  android:title="@string/pref_video_debanding_title"
+                  android:key="video_debanding"
+                  android:summary="@string/pref_video_debanding_summary"
+                  android:defaultValue=""
+                  android:entryValues="@array/deband_values"
+                  newenigmahd:iconSpaceReserved="false" />
+  <is.xyz.mpv.preferences.InterpolationDialogPreference android:title="@string/pref_video_interpolation_title"
+                        android:key="video"
+                        android:summary=""
+                        android:dialogMessage="@string/pref_video_interpolation_message"
+                        newenigmahd:iconSpaceReserved="false"
+                        newenigmahd:sync_default="@string/pref_video_interpolation_sync_default"
+                        newenigmahd:sync_entries="@array/video_sync" />
+  <is.xyz.mpv.preferences.ScalerDialogPreference android:title="@string/pref_video_tscale_title"
+                        android:key="video_tscale"
+                        android:summary="@string/pref_video_tscale_summary"
+                        android:dialogMessage="@string/pref_video_tscale_message"
+                        newenigmahd:entries="@array/temporal_scaler_list"
+                        newenigmahd:iconSpaceReserved="false" />
+  <SwitchPreferenceCompat android:title="@string/pref_video_fastdecode_title"
+                        android:key="video_fastdecode"
+                        android:summary="@string/pref_video_fastdecode_summary"
+                        android:defaultValue="false"
+                        newenigmahd:iconSpaceReserved="false" />
+</PreferenceScreen>

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<resources>
+  <anim name="abc_fade_in">res/anim/abc_fade_in.xml</anim>
+  <anim name="abc_popup_enter">res/anim/abc_popup_enter.xml</anim>
+  <anim name="abc_popup_exit">res/anim/abc_popup_exit.xml</anim>
+  <anim name="abc_slide_out_bottom">res/anim/abc_slide_out_bottom.xml</anim>
+  <anim name="abc_slide_out_top">res/anim/abc_slide_out_top.xml</anim>
+  <anim name="abc_tooltip_enter">res/anim/abc_tooltip_enter.xml</anim>
+</resources>

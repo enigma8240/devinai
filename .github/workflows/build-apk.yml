@@ -1,56 +1,75 @@
-name: Build MSX MPV Android APK
+name: Build mpv-lite APK (APKEditor)
+
+# Bu proje Gradle/Kotlin DEGIL - decoded/ klasoru, benzac'in gercek MSX
+# motoru (de.benzac.tvx.*) ile mpv-android'in (is.xyz.mpv.*) ayni APK icinde
+# birlestirilmis, APKEditor ile decode edilmis smali/resource agacidir.
+# Degisiklikler decoded/ altinda dogrudan smali/resource duzenlemesiyle
+# yapilir; bu workflow sadece o agaci yeniden APK'ya derleyip imzalar.
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    branches: [main]
+    paths:
+      - "decoded/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch: {}
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Depoyu indir
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: JDK 17 kur
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
-      - name: Android SDK lisanslarini kabul et
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
-
-      - name: Gradle 8.7 kur
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
-      - name: APK derle
-        run: gradle assembleDebug assembleRelease
-
-      - name: Debug APK Yükle
-        uses: actions/upload-artifact@v4
-        with:
-          name: msx-mpv-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-
-      - name: Release APK Yükle
-        uses: actions/upload-artifact@v4
-        with:
-          name: msx-mpv-release-apk
-          path: app/build/outputs/apk/release/*.apk
-
-      - name: GitHub Release olarak yayinla (kolay indirme icin)
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Download APKEditor 1.4.3
         run: |
-          gh release create "build-${{ github.run_number }}" \
-            app/build/outputs/apk/debug/*.apk \
-            app/build/outputs/apk/release/*.apk \
-            --title "MSX MPV Player - build #${{ github.run_number }}" \
-            --notes "Otomatik derleme. Commit: ${{ github.sha }}"
+          curl -L -o APKEditor.jar \
+            https://github.com/REAndroid/APKEditor/releases/download/V1.4.3/APKEditor-1.4.3.jar
+
+      - name: Download uber-apk-signer 1.3.0
+        run: |
+          curl -L -o uber-apk-signer.jar \
+            https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
+
+      - name: Build APK from decoded/ (APKEditor)
+        run: java -jar APKEditor.jar b -i decoded -o app-unsigned.apk
+
+      - name: Round-trip verify (decode the freshly built APK back)
+        run: |
+          java -jar APKEditor.jar d -i app-unsigned.apk -o roundtrip-check -t raw -f
+          echo "Round-trip decode OK"
+
+      - name: Sign with project debug keystore
+        run: |
+          java -jar uber-apk-signer.jar \
+            -a app-unsigned.apk \
+            --ks signing/debug.keystore \
+            --ksAlias androiddebugkey \
+            --ksPass android \
+            --ksKeyPass android \
+            --out signed-out \
+            --allowResign
+
+      - name: Rename output
+        run: |
+          mkdir -p dist
+          cp signed-out/app-unsigned-aligned-signed.apk dist/mpv-lite.apk
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpv-lite-apk
+          path: dist/mpv-lite.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "MPV-Lite (MSX kabuğu + mpv) - build #${{ github.run_number }}"
+          files: dist/mpv-lite.apk

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:tvx="http://www.benzac.de/tvx">
+    <head>
+        <title>TVX</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="author" content="Benjamin Zachey" />
+        <meta name="contact" content="admin@benzac.de" />
+        <meta name="copyright" content="Benjamin Zachey" />      
+        <link type="image/png" rel="shortcut icon" href="img/icon.png?v=0.1.165" />
+        <link type="text/css" rel="stylesheet" href="css/tvx-app.min.css?v=0.1.165" tvx:style="css/tvx-app-{FACTOR}.min.css?v=0.1.165" />       
+        <script type="text/javascript" src="js/jquery.min.js?v=0.1.165"></script>
+        <script type="text/javascript" src="js/tvx-app.min.js?v=0.1.165"></script>       
+        <script type="text/javascript">
+            TVXManager.init({
+                key: "tRXoS3ekp6xvFDon",
+                platform: "android|firetv",
+                suffix: " ({PLATFORM})"
+            });
+        </script>
+    </head>
+    <body>
+        <div id="tvxRoot" class="tvx-root"> 
+            <div id="tvxDimmer" class="tvx-dimmer" style="display:none;"></div>           
+            <div id="tvxScreen" class="tvx-screen">
+                <div tvx:src="html/app-bg.html"></div>
+                <div id="tvxVideoScene" class="tvx-fullscreen" style="display:none;">
+                    <div id="tvxVideoContainer" class="tvx-fullscreen tvx-video">
+                        <video id="tvxVideo" tvx:container="tvxVideoContainer" playsinline="playsinline"></video>   
+                    </div>
+                    <div id="tvxVideoPluginContainer" class="tvx-fullscreen tvx-video" style="display:none;">                       
+                        <div id="tvxVideoPlugin" tvx:container="tvxVideoPluginContainer"></div>                        
+                    </div>
+                </div>
+            </div>
+            <div tvx:src="html/tvx-frame.html"></div>
+            <div id="tvxScenes" class="tvx-scenes">
+                <div tvx:src="html/app-ui.html"></div>
+                <div tvx:src="html/tvx-ui.html"></div>
+            </div>
+            <div tvx:src="html/tvx-remote{REMOTE}.html" tvx:type="input"></div>
+        </div>        
+    </body>
+</html>

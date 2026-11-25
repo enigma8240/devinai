@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<RelativeLayout android:id="@id/main"
+                android:padding="24.0dp"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
+  <androidx.appcompat.widget.SwitchCompat android:id="@id/switch1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="subs data uri"
+                        android:layout_below="@id/row1" />
+  <androidx.appcompat.widget.SwitchCompat android:id="@id/switch2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="no hwdec"
+                        android:layout_below="@id/switch1" />
+  <androidx.appcompat.widget.SwitchCompat android:id="@id/switch3"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="force title"
+                        android:layout_below="@id/switch2" />
+  <Button android:id="@id/button"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="Launch"
+          android:layout_below="@id/row2" />
+  <TextView android:id="@id/info"
+            android:scrollbars="vertical"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:scrollHorizontally="true"
+            android:layout_below="@id/button"
+            android:fontFamily="monospace" />
+  <LinearLayout android:orientation="horizontal"
+                android:id="@id/row2"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/switch3">
+    <TextView android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="offset:"
+              android:labelFor="@id/editText1" />
+    <SeekBar android:id="@id/seekBar2"
+             android:layout_width="fill_parent"
+             android:layout_height="wrap_content"
+             android:max="30"
+             android:progress="0" />
+  </LinearLayout>
+  <LinearLayout android:orientation="horizontal"
+                android:id="@id/row1"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content">
+    <TextView android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="URL:"
+              android:labelFor="@id/editText1" />
+    <EditText android:id="@id/editText1"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content"
+              android:inputType="textUri"
+              android:autofillHints="" />
+  </LinearLayout>
+</RelativeLayout>

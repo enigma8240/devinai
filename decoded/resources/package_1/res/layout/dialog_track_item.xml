@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<android.widget.CheckedTextView android:textAppearance="?android:attr/textAppearanceMedium"
+                      android:textColor="#ffffffff"
+                      android:ellipsize="middle"
+                      android:gravity="center_vertical"
+                      android:id="@android:id/text1"
+                      android:background="@drawable/ne_track_item_bg"
+                      android:paddingLeft="?attr/listPreferredItemPaddingLeft"
+                      android:paddingRight="?attr/listPreferredItemPaddingRight"
+                      android:focusable="true"
+                      android:layout_width="fill_parent"
+                      android:layout_height="wrap_content"
+                      android:minHeight="?attr/listPreferredItemHeightSmall"
+                      android:text="\#1: SDH (eng)"
+                      android:singleLine="true"
+                      android:drawableStart="?android:attr/listChoiceIndicatorSingle" xmlns:android="http://schemas.android.com/apk/res/android" />

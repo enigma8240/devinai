@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<resources>
+  <array name="app_options">
+    <item>@string/action_restart</item>
+    <item>@string/action_log</item>
+    <item>@string/action_exit</item>
+  </array>
+</resources>

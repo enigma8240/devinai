@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <Preference android:persistent="false"
+              android:key="ne_device_code_pref"
+              newenigmahd:icon="@drawable/round_info_24"
+              newenigmahd:title="@string/pref_device_code_title" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$GeneralPreference"
+              newenigmahd:icon="@drawable/round_palette_24"
+              newenigmahd:summary="@string/pref_header_general_summary"
+              newenigmahd:title="@string/pref_header_general" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$VideoPreference"
+              newenigmahd:icon="@drawable/round_play_arrow_24"
+              newenigmahd:summary="@string/pref_header_video_summary"
+              newenigmahd:title="@string/pref_header_video" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$UIPreference"
+              newenigmahd:icon="@drawable/round_video_settings_24"
+              newenigmahd:summary="@string/pref_header_ui_summary"
+              newenigmahd:title="@string/pref_header_ui" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$GesturePreference"
+              newenigmahd:icon="@drawable/round_gesture_24"
+              newenigmahd:summary="@string/pref_header_gestures_summary"
+              newenigmahd:title="@string/pref_header_gestures" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$DeveloperPreference"
+              newenigmahd:icon="@drawable/round_code_24"
+              newenigmahd:summary="@string/pref_header_developer_summary"
+              newenigmahd:title="@string/pref_header_developer" />
+  <Preference newenigmahd:fragment="is.xyz.mpv.preferences.PreferenceActivity$AdvancePreference"
+              newenigmahd:icon="@drawable/round_settings_24"
+              newenigmahd:summary="@string/pref_header_advanced_summary"
+              newenigmahd:title="@string/pref_header_advanced" />
+  <Preference newenigmahd:icon="@drawable/round_info_24"
+              newenigmahd:summary="@string/pref_header_about_mpv_summary"
+              newenigmahd:title="@string/pref_header_about_mpv">
+    <intent android:targetPackage="is.xyz.mpv"
+            android:targetClass="is.xyz.mpv.preferences.AboutActivity" />
+  </Preference>
+</PreferenceScreen>

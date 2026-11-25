@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<RelativeLayout android:id="@id/main"
+                android:padding="16.0dp"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
+  <androidx.appcompat.widget.SwitchCompat android:id="@id/switch1"
+                        android:padding="16.0dp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="video only" />
+  <androidx.appcompat.widget.SwitchCompat android:id="@id/switch2"
+                        android:padding="16.0dp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="decoders only"
+                        android:layout_toEndOf="@id/switch1" />
+  <TextView android:id="@id/info"
+            android:scrollbars="vertical"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:scrollHorizontally="true"
+            android:layout_below="@id/switch1"
+            android:textIsSelectable="true"
+            android:fontFamily="monospace" />
+</RelativeLayout>

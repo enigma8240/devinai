@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <ListPreference android:entries="@array/stats_entries"
+                  android:title="@string/pref_stats_mode_title"
+                  android:key="stats_mode"
+                  android:summary="@string/pref_stats_mode_summary"
+                  android:defaultValue=""
+                  android:entryValues="@array/stats_values"
+                  newenigmahd:iconSpaceReserved="false" />
+  <SwitchPreferenceCompat android:title="@string/pref_ignore_audio_focus_title"
+                        android:key="ignore_audio_focus"
+                        android:summary="@string/pref_ignore_audio_focus_summary"
+                        android:defaultValue="false"
+                        newenigmahd:iconSpaceReserved="false" />
+  <SwitchPreferenceCompat android:title="@string/pref_gpu_debug_title"
+                        android:key="gpudebug"
+                        android:defaultValue="false"
+                        newenigmahd:iconSpaceReserved="false" />
+</PreferenceScreen>

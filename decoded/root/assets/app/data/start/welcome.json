@@ -1,0 +1,179 @@
+{
+    "reuse": false,
+    "name": "Welcome Pages",
+    "version": "1.0.3",
+    "headline": "{app:name}",
+    "menu": [{
+            "icon": "info",
+            "label": "Welcome",
+            "data": {               
+                "pages": [{                        
+                        "items": [{
+                                "type": "default",
+                                "layout": "0,0,12,6",                                 
+                                "color": "msx-glass",
+                                "headline": "Welcome to {app:name}",
+                                "text": [
+                                    "{app:name} is a cross-platform web application for creating customized media pages (consisting of videos, audios, images, texts, and links).",                                     
+                                    " It does not contain any content and is a so-called {txt:msx-white:White Label Application}.", 
+                                    " You can either create your own content or open existing and shared content from other people. All content is written in {txt:msx-white:JSON} (JavaScript Object Notation) format with a simple and easy-to-use structure.", 
+                                    " The created JSON files can be hosted on any HTTP server that supports {txt:msx-white:CORS} (Cross-Origin Resource Sharing).",                                   
+                                    "{br}{br}{txt:msx-white:How to create your own content?}",
+                                    "{br}The content you are currently looking at contains various menu and content examples that you can use as reference to create your own media pages.",
+                                    " The link to these examples and the complete API can be found here {txt:msx-white:https://msx.benzac.de/info/}.",
+                                    "{br}{br}{txt:msx-white:How to load your own content?}",
+                                    "{br}If you have created and hosted your JSON files, go to {txt:msx-white:Settings} {ico:arrow-forward} {txt:msx-white:Start Parameter} {ico:arrow-forward} {txt:msx-white:Setup} and enter the hostname or IP address of your HTTP server.",
+                                    " Once you have completed the start parameter setup, your content is loaded every time you start the application."                                   
+                                ]
+                            }]
+                    }, {
+                        "items": [{
+                                "type": "default",
+                                "layout": "0,0,12,6",   
+                                "color": "msx-glass",
+                                "headline": "Features",
+                                "text": [              
+                                    "- Create simple or complex media pages.",
+                                    "{br}- Easily navigate through these media pages by using your remote control or pointer device.",                                                                      
+                                    "{br}- Play multiple videos/audios in a playlist.",
+                                    "{br}- Show multiple images in a slideshow.",
+                                    "{br}- While watching a video or listening to an audio, simultaneously browse further media pages (the video/audio keeps running in the background).",
+                                    "{br}- Open links in full screen mode.",
+                                    "{br}{br}{txt:msx-white:Hints}",
+                                    "{br}- Use the menu {ico:msx-white:menu} button to quickly access all major controls or additional options.",
+                                    " If your remote control does not have a menu button, please use the blue {ico:msx-blue:stop} button, alternatively.",
+                                    "{br}- You can define an extra menu button under {txt:msx-white:Settings} {ico:arrow-forward} {txt:msx-white:Menu Button}.",
+                                    "{br}- This application runs on TV, mobile, and desktop devices."
+                                ]
+                            }]
+                    }]
+            }
+        }, {
+            "display": false,
+            "type": "separator",
+            "label": "Default Menu Items"
+        }, {
+            "display": false,
+            "label": "Item 1.1",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "label": "Item 1.2",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "label": "Item 1.3",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "type": "separator",
+            "label": "Menu Items With Icons"
+        }, {
+            "display": false,
+            "icon": "home",
+            "label": "Item 2.1",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "person",
+            "label": "Item 2.2",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "star",
+            "label": "Item 2.3",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "type": "separator",
+            "label": "Menu Items With Icons & Extensions"
+        }, {
+            "display": false,
+            "icon": "home",
+            "label": "Item 3.1",
+            "extensionLabel": "123",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "person",
+            "label": "Item 3.2",
+            "extensionIcon": "music-note",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "star",
+            "label": "Item 3.3",
+            "extensionLabel": "{ico:favorite}{ico:favorite}{ico:favorite}",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "type": "separator",
+            "label": "Colored Menu Items"
+        }, {
+            "display": false,
+            "icon": "msx-red:home",
+            "label": "{txt:msx-red:Item 4.1}",
+            "extensionLabel": "{txt:msx-blue:123}",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "msx-green:person",
+            "label": "{txt:msx-green:Item 4.2}",
+            "extensionIcon": "msx-blue:music-note",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "icon": "msx-yellow:star",
+            "label": "{txt:msx-yellow:Item 4.3}",
+            "extensionLabel": "{ico:msx-blue:favorite}{ico:msx-blue:favorite}{ico:msx-blue:favorite}",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "type": "separator",            
+            "label": "Menu Items With Backgrounds"
+        }, {
+            "display": false,
+            "label": "Item 5.1",          
+            "background": "img/bg1.jpg",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "label": "Item 5.2",          
+            "background": "img/bg2.jpg",
+            "data": "data:start:placeholder"
+        }, {
+            "display": false,
+            "label": "Item 5.3",          
+            "background": "img/bg3.jpg",
+            "data": "data:start:placeholder"
+        }, {
+            "type": "separator"
+        }, {    
+            "icon": "apps",
+            "label": "Content",
+            "data": {               
+                "pages": [{
+                        "items": [{
+                                "type": "button",
+                                "icon": "build",
+                                "layout": "0,0,3,3",                                            
+                                "label": "Guide",
+                                "action": "menu:data:guide:menu"
+                            }, {
+                                "display": true,
+                                "type": "button",
+                                "tag": "Web",
+                                "icon": "stars",
+                                "layout": "3,0,3,3",                                            
+                                "label": "Examples",                               
+                                "action": "content:http://msx.benzac.de/info/data/examples/screens.json"
+                            }]
+                    }]
+            }
+        }, {
+            "type": "separator"
+        }, {          
+            "type": "settings"            
+        }
+    ]
+}

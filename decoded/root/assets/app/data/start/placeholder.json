@@ -1,0 +1,12 @@
+{
+    "headline": "Placeholder",
+    "pages": [{  
+            "items": [{
+                    "type": "default",
+                    "layout": "0,0,12,6",     
+                    "color": "msx-glass",
+                    "headline": "Content Placeholder",
+                    "text": "This is just a placeholder.{br}If you want to see how this placeholder can be filled with content, please go to the {txt:msx-white:Content} menu item."
+                }]
+        }]
+}

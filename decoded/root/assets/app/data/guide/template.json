@@ -1,0 +1,31 @@
+{
+    "type": "pages",
+    "headline": "Template",
+    "pages": [{  
+            "items": [{
+                    "type": "button",                                
+                    "layout": "0,0,3,3",
+                    "icon": "stop",
+                    "label": "Item",
+                    "action": "content:data:guide:template_item"
+                }, {
+                    "type": "button",                                
+                    "layout": "3,0,3,3",
+                    "icon": "view-array",
+                    "label": "Pages",
+                    "action": "content:data:guide:template_pages"
+                }, {
+                    "type": "button",                                
+                    "layout": "6,0,3,3",
+                    "icon": "view-stream",
+                    "label": "List",
+                    "action": "content:data:guide:template_list"
+                }, {
+                    "type": "button",                                
+                    "layout": "9,0,3,3",
+                    "icon": "web-asset",
+                    "label": "Panel",
+                    "action": "panel:data:guide:template_list"
+                }]
+        }]
+}

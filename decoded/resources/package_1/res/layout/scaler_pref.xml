@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<LinearLayout android:orientation="vertical"
+              android:paddingLeft="24.0dp"
+              android:paddingTop="8.0dp"
+              android:paddingRight="24.0dp"
+              android:layout_width="fill_parent"
+              android:layout_height="fill_parent"
+              android:paddingHorizontal="24.0dp" xmlns:android="http://schemas.android.com/apk/res/android">
+  <com.google.android.material.textfield.TextInputLayout android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        style="?attr/textInputOutlinedExposedDropdownMenuStyle">
+    <AutoCompleteTextView android:id="@id/scaler"
+                          android:layout_width="fill_parent"
+                          android:layout_height="wrap_content"
+                          android:hint="@string/scaler_filter"
+                          android:inputType="none" />
+  </com.google.android.material.textfield.TextInputLayout>
+  <com.google.android.material.textfield.TextInputLayout android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        style="?attr/textInputOutlinedStyle">
+    <EditText android:id="@id/param1"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content"
+              android:hint="@string/scaler_param1"
+              android:inputType="numberDecimal|numberSigned"
+              android:autofillHints="" />
+  </com.google.android.material.textfield.TextInputLayout>
+  <com.google.android.material.textfield.TextInputLayout android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        style="?attr/textInputOutlinedStyle">
+    <EditText android:id="@id/param2"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content"
+              android:hint="@string/scaler_param2"
+              android:inputType="numberDecimal|numberSigned"
+              android:autofillHints="" />
+  </com.google.android.material.textfield.TextInputLayout>
+</LinearLayout>

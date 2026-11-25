@@ -1,0 +1,94 @@
+<div id="appStartScene" class="tvx-fullscreen app-overlay-video">
+    <image src="img/icon_raw.png" class="app-start-icon" />   
+    <span class="app-start-caption">{APP.NAME} {APP.VERSION}{APP.SUFFIX}</span>    
+</div>
+<div id="appMainScene" class="tvx-fullscreen" style="display:none;">
+    <div id="appMainOverlay" class="tvx-fullscreen app-overlay-video"></div>
+    <div id="appMainContent" class="app-main-content">
+        <div id="appMainContentUnderlay" class="app-main-content-underlay tvx-click-through"></div> 
+        <div id="appMainContentPages" class="app-main-content-pages"></div> 
+        <div id="appMainContentCaptionUnderlay" class="app-main-content-caption-underlay tvx-click-through"></div>
+        <div id="appMainContentOverlay" class="app-main-content-overlay tvx-click-through"></div>        
+        <div id="appMainContentPager" class="app-pager tvx-click-through"></div>
+        <span id="appMainContentHeadline" class="app-main-content-headline tvx-click-through"></span>
+        <span id="appMainContentExtension" class="app-main-content-extension tvx-click-through"></span>
+    </div>
+    <div id="appMainCaption" class="app-caption tvx-click-through"></div>    
+    <div id="appMainMenuContainer" class="app-main-menu-container" style="display:none;">
+        <div class="app-main-menu-background"></div>
+        <div class="app-main-menu-separator"></div>
+        <div id="appMainMenu" class="app-main-menu">
+            <div id="appMainMenuItems" class="app-main-menu-items"></div>
+        </div>
+        <div id="appMainMenuLogo" class="app-main-menu-logo tvx-click-through"></div>
+        <span id="appMainMenuHeadline" class="app-main-menu-headline tvx-click-through"></span>        
+    </div>    
+</div>
+<div id="appLogScene" class="tvx-fullscreen app-overlay-video" style="display:none;">   
+    <div id="appLogText" class="app-log-text"></div>
+</div>
+<div id="appSliderScene" class="tvx-fullscreen app-overlay-slider" style="display:none;">
+    <div id="appSliderItems" class="app-slider-items"></div>
+    <div id="appSliderLabels" class="app-slider-labels tvx-click-through" style="display:none;"></div>    
+</div>
+<div id="appPlayerScene" class="tvx-fullscreen" style="display:none;">
+    <span id="appPlayerHeadline" class="app-player-headline"></span>
+    <span id="appPlayerExtension" class="app-player-extension"></span>
+    <span id="appPlayerInfoText" class="app-player-info-text"></span>
+    <div id="appPlayerInfoImage" class="app-player-info-image"></div>
+    <div id="appPlayer" class="app-player">
+        <div class="app-player-separator"></div>        
+        <span id="appPlayerLabel" class="app-player-label"></span>
+        <span id="appPlayerExtensionLabel" class="app-player-extension-label"></span>
+        <span id="appPlayerPosition" class="app-player-position"></span>
+        <span id="appPlayerDuration" class="app-player-duration"></span>
+        <span id="appPlayerSpeed" class="app-player-speed"></span>     
+        <div id="appPlayerProgressHoverArea" class="app-player-progress-hover-area"></div>
+        <div id="appPlayerProgress" class="app-player-progress">
+            <div class="app-player-progress-filler"></div>
+            <div class="app-player-progress-marker" style="display:none;">
+                <div class="app-player-progress-marker-label-container">
+                    <span class="app-player-progress-marker-label"></span>
+                </div>
+                <div class="app-player-progress-marker-arrow"></div>
+            </div>
+        </div>
+        <div id="appPlayerItems" class="app-player-items"></div>
+    </div>
+</div>
+<div id="appPanelScene" class="tvx-top-layer tvx-fullscreen app-overlay-panel" style="display:none;">
+    <div class="app-panel-separator-left"></div>
+    <div class="app-panel-background"></div>    
+    <div class="app-panel-separator-right"></div>
+    <div id="appPanelContent" class="app-panel-content">
+        <div id="appPanelContentUnderlay" class="app-panel-content-underlay tvx-click-through"></div> 
+        <div id="appPanelContentPages" class="app-panel-content-pages"></div>  
+        <div id="appPanelContentCaptionUnderlay" class="app-panel-content-caption-underlay tvx-click-through"></div>
+        <div id="appPanelContentOverlay" class="app-panel-content-overlay tvx-click-through"></div>
+        <div id="appPanelContentPager" class="app-pager tvx-click-through"></div>
+        <span id="appPanelContentHeadline" class="app-panel-content-headline tvx-click-through"></span>
+        <span id="appPanelContentExtension" class="app-panel-content-extension tvx-click-through"></span>
+    </div>
+</div>
+<div id="appVolumeScene" class="tvx-top-layer tvx-fullscreen app-overlay-volume" style="display:none;">
+    <div id="appVolume" class="app-volume">
+        <div class="app-volume-separator"></div>
+        <div  id="appVolumeIcon" class="app-volume-icon"></div>
+        <span id="appVolumeLabel" class="app-volume-label"></span>
+        <div id="appVolumeLevel" class="app-volume-level">   
+            <div class="app-volume-level-filler"></div>
+        </div>
+    </div>
+</div>
+<div id="appNotificationScene" class="tvx-top-layer tvx-fullscreen app-overlay-notification" style="display:none;">
+    <div id="appNotification" class="app-notification">
+        <div class="app-notification-separator"></div>       
+        <div id="appNotificationItem" class="app-notification-item"></div>
+    </div>
+</div>
+<div id="appScreenSaverScene" class="tvx-top-layer tvx-fullscreen app-overlay-screen-saver" style="display:none;">  
+    <image src="img/icon_raw.png" class="app-screen-saver-icon" />
+    <span id="appScreenSaverTime" class="app-screen-saver-time"></span>
+    <span id="appScreenSaverTimeExtension" class="app-screen-saver-time-extension"></span>
+    <span id="appScreenSaverDate" class="app-screen-saver-date"></span>
+</div>

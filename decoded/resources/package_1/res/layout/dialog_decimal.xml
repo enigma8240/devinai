@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<LinearLayout android:gravity="center_horizontal"
+              android:orientation="vertical"
+              android:layout_width="fill_parent"
+              android:layout_height="fill_parent"
+              android:textAlignment="center" xmlns:android="http://schemas.android.com/apk/res/android">
+  <TextView android:id="@id/label1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/track_primary" />
+  <TableRow android:gravity="center"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content">
+    <android.widget.Button android:id="@id/btnMinus"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="@string/btn_minus"
+                          style="@style/Widget.AppCompat.Button.Borderless" />
+    <android.widget.EditText android:id="@id/editText"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:ems="3"
+                          android:inputType="numberDecimal|numberSigned"
+                          android:autofillHints="" />
+    <android.widget.Button android:id="@id/btnPlus"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="@string/btn_plus"
+                          style="@style/Widget.AppCompat.Button.Borderless" />
+  </TableRow>
+  <TextView android:id="@id/label2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/track_secondary" />
+  <TableRow android:gravity="center"
+            android:id="@id/rowSecondary"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content">
+    <android.widget.Button android:id="@id/btnMinus2"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="@string/btn_minus"
+                          style="@style/Widget.AppCompat.Button.Borderless" />
+    <android.widget.EditText android:id="@id/editText2"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:ems="3"
+                          android:inputType="numberDecimal|numberSigned"
+                          android:autofillHints="" />
+    <android.widget.Button android:id="@id/btnPlus2"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="@string/btn_plus"
+                          style="@style/Widget.AppCompat.Button.Borderless" />
+  </TableRow>
+</LinearLayout>

@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<RelativeLayout android:orientation="vertical"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
+  <TextView android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textStyle="bold"
+            android:id="@id/textView"
+            android:paddingTop="8.0dp"
+            android:paddingBottom="8.0dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true" />
+  <android.widget.Button android:layout_gravity="end"
+                        android:id="@id/resetBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/dialog_reset"
+                        android:layout_marginStart="12.0dp"
+                        android:layout_marginEnd="12.0dp"
+                        android:layout_alignParentEnd="true"
+                        style="@style/Widget.AppCompat.Button.Borderless.Colored" />
+  <SeekBar android:id="@id/seekBar"
+           android:layout_width="fill_parent"
+           android:layout_height="wrap_content"
+           android:layout_below="@id/resetBtn" />
+</RelativeLayout>

@@ -1,0 +1,20 @@
+{
+    "headline": "Actions",   
+    "menu": [{
+            "label": "Videos",
+            "data": "data:guide:videos"
+        }, {
+            "label": "Audios",
+            "data": "data:guide:audios"
+        }, {
+            "label": "Images",
+            "data": "data:guide:images"
+        }, {
+            "label": "Links",
+            "data": "data:guide:links"
+        }, {
+            "label": "Mixed",
+            "data": "data:guide:mixed"
+        }
+    ]
+}

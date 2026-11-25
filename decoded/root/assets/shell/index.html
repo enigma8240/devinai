@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>NewEnigma</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #151823;
+    --fg: #eef1f8;
+    --muted: #8a93a6;
+    --accent: #3ea6ff;
+    --danger: #ff5a5a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+    overflow: hidden;
+  }
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px; background: var(--panel);
+    border-bottom: 1px solid #22263333;
+  }
+  #header h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  #header .sub { color: var(--muted); font-size: 14px; }
+  #screen {
+    height: calc(100% - 68px);
+    overflow-y: auto;
+    padding: 18px 28px 60px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item {
+    background: var(--panel);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    outline: none;
+    font-size: 17px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .item .thumb {
+    width: 48px; height: 48px; border-radius: 8px; background: #22263a;
+    background-size: cover; background-position: center; flex: none;
+  }
+  .item:focus, .item.focused {
+    border-color: var(--accent);
+    background: #1d2333;
+  }
+  .item .label { flex: 1; }
+  .item .label .title { font-weight: 600; }
+  .item .label .text { color: var(--muted); font-size: 13px; white-space: pre-line; margin-top: 4px; }
+  .center-box {
+    max-width: 640px; margin: 40px auto; text-align: center;
+    background: var(--panel); border-radius: 14px; padding: 36px 28px;
+  }
+  .center-box h2 { margin-top: 0; }
+  .code { font-size: 34px; letter-spacing: 4px; color: var(--accent); font-weight: 700; margin: 18px 0; }
+  input[type=text] {
+    width: 100%; padding: 14px; font-size: 18px; border-radius: 8px;
+    border: 2px solid #2a3044; background: #0e111a; color: var(--fg); margin-bottom: 14px;
+  }
+  button.primary {
+    background: var(--accent); color: #06111c; border: none; border-radius: 8px;
+    padding: 14px 22px; font-size: 17px; font-weight: 700; cursor: pointer;
+  }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #1d2333; border: 1px solid var(--accent); color: var(--fg);
+    padding: 12px 22px; border-radius: 10px; font-size: 15px; display: none; max-width: 80%;
+  }
+  #toast.error { border-color: var(--danger); }
+  .err-text { color: var(--danger); }
+</style>
+</head>
+<body>
+  <div id="header">
+    <h1 id="headline">NewEnigma</h1>
+    <div class="sub" id="subline"></div>
+  </div>
+  <div id="screen"></div>
+  <div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var hasBridge = typeof Shell !== "undefined";
+  var screenEl = document.getElementById("screen");
+  var headlineEl = document.getElementById("headline");
+  var sublineEl = document.getElementById("subline");
+  var toastEl = document.getElementById("toast");
+
+  var serverAddr = "";
+  var deviceId = "";
+  // navStack: {url, data} - data kullanilan JSON (geri donusunde yeniden cekmeye gerek kalmasin diye)
+  var navStack = [];
+
+  function log(msg) {
+    try { console.log("[shell] " + msg); } catch (e0) {}
+    try { if (hasBridge) Shell.logError(msg); } catch (e1) {}
+  }
+
+  window.onerror = function (msg, src, line, col, err) {
+    log("JS hata: " + msg + " (" + src + ":" + line + ")");
+    return false;
+  };
+
+  function toast(msg, isError) {
+    toastEl.textContent = msg;
+    toastEl.className = isError ? "error" : "";
+    toastEl.style.display = "block";
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.style.display = "none"; }, 4000);
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  // ---- ayarlanabilir sunucu adresi + cihaz kimligi ----
+  function loadPrefs() {
+    try { serverAddr = hasBridge ? (Shell.getServerAddress() || "") : (localStorage.getItem("server") || ""); } catch (e) { serverAddr = ""; }
+    try { deviceId = hasBridge ? (Shell.getDeviceId() || "") : (localStorage.getItem("device_id") || ""); } catch (e) { deviceId = ""; }
+    if (!deviceId) {
+      deviceId = "shell-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+      try { if (!hasBridge) localStorage.setItem("device_id", deviceId); } catch (e) {}
+    }
+  }
+
+  function saveServer(addr) {
+    serverAddr = addr.replace(/\/+$/, "");
+    try { if (hasBridge) Shell.setServerAddress(serverAddr); else localStorage.setItem("server", serverAddr); } catch (e) {}
+  }
+
+  function apiUrl(view, extraQuery) {
+    return serverAddr + "/api/msx?view=" + encodeURIComponent(view) +
+      "&device=" + encodeURIComponent(deviceId) + "&pl=msx" + (extraQuery || "");
+  }
+
+  // ---- sunucu adresi giris ekrani ----
+  function renderServerSetup(prefill, errMsg) {
+    headlineEl.textContent = "NewEnigma";
+    sublineEl.textContent = "";
+    screenEl.innerHTML =
+      '<div class="center-box">' +
+      '<h2>Sunucu adresi</h2>' +
+      '<p>Ornek: https://newnigma.online</p>' +
+      (errMsg ? '<p class="err-text">' + esc(errMsg) + '</p>' : "") +
+      '<input type="text" id="srvInput" value="' + esc(prefill || "") + '" placeholder="https://..." />' +
+      '<button class="primary" id="srvSave">Kaydet ve devam et</button>' +
+      '</div>';
+    var input = document.getElementById("srvInput");
+    var btn = document.getElementById("srvSave");
+    var go = function () {
+      var v = input.value.trim();
+      if (!v) { toast("Adres bos olamaz", true); return; }
+      if (v.indexOf("http") !== 0) v = "https://" + v;
+      saveServer(v);
+      loadRoot();
+    };
+    btn.addEventListener("click", go);
+    input.addEventListener("keydown", function (e) { if (e.keyCode === 13) go(); });
+    input.focus();
+  }
+
+  // ---- aktivasyon ekrani ----
+  function renderActivation(json) {
+    var code = "----";
+    var items = json.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var m = /Device code:\s*(.+)/i.exec(items[i].label || "");
+      if (m) { code = m[1].trim(); break; }
+    }
+    headlineEl.textContent = "Aktivasyon gerekli";
+    sublineEl.textContent = "";
+    screenEl.innerHTML =
+      '<div class="center-box">' +
+      '<h2>Bu cihaz henuz aktif degil</h2>' +
+      '<div class="code">' + esc(code) + "</div>" +
+      "<p>Bu kodu saglayicinizla paylasin, aktive edildikten sonra asagidaki butona basin.</p>" +
+      '<button class="primary" id="actRetry">Tekrar dene</button>' +
+      '<p style="margin-top:18px"><a href="#" id="actChangeSrv" style="color:var(--muted)">Sunucu adresini degistir</a></p>' +
+      "</div>";
+    document.getElementById("actRetry").addEventListener("click", function () { loadRoot(); });
+    document.getElementById("actChangeSrv").addEventListener("click", function (e) {
+      e.preventDefault();
+      renderServerSetup(serverAddr);
+    });
+  }
+
+  // ---- genel hata ekrani ----
+  function renderError(msg) {
+    headlineEl.textContent = "Hata";
+    screenEl.innerHTML =
+      '<div class="center-box">' +
+      '<h2 class="err-text">Bir sorun olustu</h2>' +
+      '<p>' + esc(msg) + "</p>" +
+      '<button class="primary" id="errRetry">Tekrar dene</button>' +
+      '<p style="margin-top:18px"><a href="#" id="errChangeSrv" style="color:var(--muted)">Sunucu adresini degistir</a></p>' +
+      "</div>";
+    document.getElementById("errRetry").addEventListener("click", function () {
+      if (navStack.length) reopen(navStack[navStack.length - 1], true);
+      else loadRoot();
+    });
+    document.getElementById("errChangeSrv").addEventListener("click", function (e) {
+      e.preventDefault();
+      renderServerSetup(serverAddr);
+    });
+  }
+
+  // ---- fetch yardimcisi ----
+  function getJson(url, cb) {
+    fetch(url, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (j) { cb(null, j); }).catch(function (err) {
+      log("fetch basarisiz: " + url + " - " + err);
+      cb(err, null);
+    });
+  }
+
+  // ---- oynatma ----
+  function playUrl(url, title) {
+    if (!url) { toast("Oynatilacak adres bulunamadi", true); return; }
+    var data = { uri: url, type: "video/*", extra: { title: String(title || "") } };
+    try {
+      if (hasBridge) {
+        Shell.playVideo(JSON.stringify(data));
+      } else {
+        log("Bridge yok, oynatma denendi: " + url);
+        toast("mpv kosusu (test modu): " + url);
+      }
+    } catch (e) {
+      log("playVideo cagrisi basarisiz: " + e);
+      toast("Oynatma baslatilamadi", true);
+    }
+  }
+
+  function extractQueryParam(qs, name) {
+    var m = new RegExp("[?&]" + name + "=([^&]+)").exec(qs);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  // ---- action isleme (menu/list/pages item'larinin 'action' alani, menuroot'ta 'data') ----
+  function runAction(action, label) {
+    if (!action) return;
+    action = String(action);
+
+    if (action === "reload") {
+      if (navStack.length) reopen(navStack[navStack.length - 1], true);
+      else loadRoot();
+      return;
+    }
+
+    if (action.indexOf("info:") === 0) { toast(action.slice(5), false); return; }
+    if (action.indexOf("error:") === 0) { toast(action.slice(6), true); return; }
+
+    if (action.indexOf("content:request:interaction:") === 0) {
+      var rest = action.slice("content:request:interaction:".length);
+      var at = rest.lastIndexOf("@");
+      var head = at >= 0 ? rest.slice(0, at) : rest;
+      var parts = head.split("|");
+      var tmplUrl = parts[0] || "";
+      var headline = parts[3] || "Arama";
+      var text = window.prompt(headline, "");
+      if (text === null) return;
+      var finalUrl = tmplUrl.replace("{INPUT}", encodeURIComponent(text));
+      navigateTo(finalUrl, label);
+      return;
+    }
+
+    if (action.indexOf("video:plugin:") === 0) {
+      var qs = action.slice("video:plugin:".length);
+      var listUrl = extractQueryParam(qs, "list");
+      var directUrl = extractQueryParam(qs, "url");
+      if (listUrl) {
+        getJson(listUrl, function (err, j) {
+          if (err || !j || !j.items || !j.items.length) { toast("Liste alinamadi", true); return; }
+          playUrl(j.items[0].u, j.items[0].t || label);
+        });
+        return;
+      }
+      if (directUrl) { playUrl(directUrl, label); return; }
+      toast("Oynatma adresi cozumlenemedi", true);
+      return;
+    }
+
+    if (action.indexOf("video:") === 0) {
+      playUrl(action.slice("video:".length), label);
+      return;
+    }
+
+    if (action.indexOf("content:") === 0) {
+      navigateTo(action.slice("content:".length), label);
+      return;
+    }
+
+    if (action.indexOf("http") === 0) {
+      // menuroot'taki 'data' alani dogrudan URL'dir (on-ek yok)
+      navigateTo(action, label);
+      return;
+    }
+
+    log("Bilinmeyen action: " + action);
+  }
+
+  // ---- navigasyon / ekran yonetimi ----
+  function navigateTo(url, label) {
+    getJson(url, function (err, j) {
+      if (err) { renderError("Yuklenemedi: " + err.message); return; }
+      navStack.push({ url: url, label: label, data: j });
+      try { history.pushState({ depth: navStack.length }, "", "#" + navStack.length); } catch (e) {}
+      renderScreen(j);
+    });
+  }
+
+  function reopen(entry, forceRefetch) {
+    if (!forceRefetch && entry.data) { renderScreen(entry.data); return; }
+    getJson(entry.url, function (err, j) {
+      if (err) { renderError("Yuklenemedi: " + err.message); return; }
+      entry.data = j;
+      renderScreen(j);
+    });
+  }
+
+  window.addEventListener("popstate", function () {
+    if (navStack.length <= 1) {
+      navStack = [];
+      loadRoot(true);
+      return;
+    }
+    navStack.pop();
+    reopen(navStack[navStack.length - 1], false);
+  });
+
+  function isActivationRequired(j) {
+    return j && j.headline === "Activation required";
+  }
+
+  function renderScreen(j) {
+    if (!j) { renderError("Bos yanit"); return; }
+    if (isActivationRequired(j)) { renderActivation(j); return; }
+
+    headlineEl.textContent = j.headline || "NewEnigma";
+    sublineEl.textContent = "";
+
+    // menuroot semasi: {headline, menu:[{icon,label,data,color}]}
+    if (Array.isArray(j.menu)) {
+      renderItemGrid(j.menu.map(function (m) {
+        return { label: m.label, action: m.data, color: m.color };
+      }));
+      return;
+    }
+
+    var items = j.items || [];
+    // sade oynatma kuyrugu (player.html formati) - buraya normalde girmemeli ama guvenlik icin:
+    if (!j.type && items.length && items[0].u) {
+      playUrl(items[0].u, items[0].t);
+      return;
+    }
+
+    if (j.type === "list" || (j.type === "pages" && j.template)) {
+      renderItemList(items);
+      return;
+    }
+
+    if (j.type === "pages" && Array.isArray(j.pages)) {
+      var flat = [];
+      j.pages.forEach(function (pg) { (pg.items || []).forEach(function (it) { flat.push(it); }); });
+      renderItemList(flat);
+      return;
+    }
+
+    renderItemList(items);
+  }
+
+  function itemTitle(it) {
+    return it.title || it.label || "";
+  }
+
+  function makeItemEl(it) {
+    var el = document.createElement("div");
+    el.className = "item";
+    el.tabIndex = 0;
+    var thumbHtml = it.image ? '<div class="thumb" style="background-image:url(\'' + esc(it.image) + '\')"></div>' : "";
+    el.innerHTML = thumbHtml +
+      '<div class="label">' +
+      '<div class="title">' + esc(itemTitle(it)) + "</div>" +
+      (it.text ? '<div class="text">' + esc(it.text) + "</div>" : "") +
+      "</div>";
+    if (it.color) el.style.borderColor = it.color;
+    var go = function () { runAction(it.action, itemTitle(it)); };
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", function (e) { if (e.keyCode === 13) go(); });
+    return el;
+  }
+
+  function renderItemGrid(items) {
+    var wrap = document.createElement("div");
+    wrap.className = "grid";
+    items.forEach(function (it) { if (it.label || it.action) wrap.appendChild(makeItemEl(it)); });
+    screenEl.innerHTML = "";
+    screenEl.appendChild(wrap);
+    focusFirst(wrap);
+  }
+
+  function renderItemList(items) {
+    var wrap = document.createElement("div");
+    wrap.className = "list";
+    items.forEach(function (it) {
+      if (!it) return;
+      if (!it.action && !it.label && !it.title && !it.text) return;
+      wrap.appendChild(makeItemEl(it));
+    });
+    screenEl.innerHTML = "";
+    screenEl.appendChild(wrap);
+    focusFirst(wrap);
+  }
+
+  function focusFirst(wrap) {
+    var first = wrap.querySelector(".item");
+    if (first) first.focus();
+  }
+
+  // Basit D-pad/klavye gezinmesi (yukari/asagi/sol/sag ok tuslari)
+  document.addEventListener("keydown", function (e) {
+    if ([37, 38, 39, 40].indexOf(e.keyCode) === -1) return;
+    var all = Array.prototype.slice.call(document.querySelectorAll(".item"));
+    if (!all.length) return;
+    var cur = document.activeElement;
+    var idx = all.indexOf(cur);
+    if (idx === -1) idx = 0;
+    var cols = 1;
+    if (screenEl.querySelector(".grid")) {
+      var gridWidth = screenEl.querySelector(".grid").offsetWidth;
+      var itemWidth = all[0].offsetWidth + 14;
+      cols = Math.max(1, Math.round(gridWidth / itemWidth));
+    }
+    if (e.keyCode === 40) idx = Math.min(all.length - 1, idx + cols);
+    else if (e.keyCode === 38) idx = Math.max(0, idx - cols);
+    else if (e.keyCode === 39) idx = Math.min(all.length - 1, idx + 1);
+    else if (e.keyCode === 37) idx = Math.max(0, idx - 1);
+    all[idx].focus();
+    e.preventDefault();
+  });
+
+  function loadRoot(skipHistoryReset) {
+    navStack = [];
+    if (!skipHistoryReset) { try { history.replaceState({ depth: 0 }, "", "#0"); } catch (e) {} }
+    headlineEl.textContent = "NewEnigma";
+    screenEl.innerHTML = '<div class="center-box"><h2>Yukleniyor...</h2></div>';
+    getJson(apiUrl("menuroot"), function (err, j) {
+      if (err) { renderError("Sunucuya ulasilamadi: " + err.message); return; }
+      renderScreen(j);
+    });
+  }
+
+  function boot() {
+    loadPrefs();
+    if (!serverAddr) { renderServerSetup(""); return; }
+    loadRoot();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

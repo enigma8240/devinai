@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<LinearLayout android:orientation="horizontal"
+              android:id="@id/nnf_item_container"
+              android:background="?attr/selectableItemBackground"
+              android:focusable="true"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content"
+              android:minHeight="?attr/listPreferredItemHeight" xmlns:android="http://schemas.android.com/apk/res/android">
+  <ImageView android:layout_gravity="center_vertical"
+             android:id="@id/item_icon"
+             android:visibility="visible"
+             android:layout_width="?attr/listPreferredItemHeight"
+             android:layout_height="?attr/listPreferredItemHeight"
+             android:src="@drawable/nnf_ic_folder_black_48dp"
+             android:scaleType="center"
+             android:adjustViewBounds="true"
+             android:tint="?attr/colorAccent" />
+  <TextView android:textAppearance="@style/TextAppearance.AppCompat.Large"
+            android:gravity="center_vertical"
+            android:id="@android:id/text1"
+            android:padding="8.0dp"
+            android:layout_width="0.0dp"
+            android:layout_height="wrap_content"
+            android:minHeight="?attr/listPreferredItemHeight"
+            android:text="@string/nnf_name"
+            android:layout_weight="1.0" />
+</LinearLayout>

@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <SwitchPreferenceCompat android:title="@string/pref_gpu_next_title"
+                        android:key="gpu_next"
+                        android:summary="@string/pref_gpu_next_summary"
+                        android:defaultValue="false"
+                        newenigmahd:iconSpaceReserved="false" />
+  <is.xyz.mpv.preferences.ConfigEditDialogPreference android:title="@string/pref_edit_mpv_conf"
+                        newenigmahd:dialogMessage="@string/pref_edit_mpv_conf_message"
+                        newenigmahd:filename="mpv.conf"
+                        newenigmahd:iconSpaceReserved="false" />
+  <is.xyz.mpv.preferences.ConfigEditDialogPreference android:title="@string/pref_edit_input_conf"
+                        newenigmahd:dialogMessage="@string/pref_edit_input_conf_message"
+                        newenigmahd:filename="input.conf"
+                        newenigmahd:iconSpaceReserved="false" />
+</PreferenceScreen>

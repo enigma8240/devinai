@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android" xmlns:netest="http://schemas.android.com/apk/res-auto">
+  <item android:id="@id/action_copy"
+        android:title="@string/action_copy"
+        netest:showAsAction="never" />
+  <item android:id="@id/action_clear"
+        android:title="@string/action_clear"
+        netest:showAsAction="never" />
+</menu>

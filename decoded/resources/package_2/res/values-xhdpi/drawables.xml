@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<resources>
+  <drawable name="notification_bg_low_normal">res/drawable-xhdpi/notification_bg_low_normal.9.png</drawable>
+  <drawable name="notification_bg_low_pressed">res/drawable-xhdpi/notification_bg_low_pressed.9.png</drawable>
+  <drawable name="notification_bg_normal">res/drawable-xhdpi/notification_bg_normal.9.png</drawable>
+  <drawable name="notification_bg_normal_pressed">res/drawable-xhdpi/notification_bg_normal_pressed.9.png</drawable>
+  <drawable name="notify_panel_notification_icon_bg">res/drawable-xhdpi/notify_panel_notification_icon_bg.png</drawable>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <item android:state_checkable="true"
+        android:state_checked="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceChecked" />
+  <item android:state_pressed="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearancePressed" />
+  <item android:state_focused="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceFocused" />
+  <item android:state_hovered="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceHovered" />
+  <item android:state_single="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceSingle" />
+  <item android:state_first="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceFirst" />
+  <item android:state_last="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceLast" />
+  <item android:state_middle="true"
+        newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceMiddle" />
+  <item newenigmahd:shapeAppearance="?attr/listItemShapeAppearanceMiddle" />
+</selector>

@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<LinearLayout android:orientation="vertical"
+              android:paddingLeft="24.0dp"
+              android:paddingTop="16.0dp"
+              android:paddingRight="24.0dp"
+              android:layout_width="fill_parent"
+              android:layout_height="fill_parent"
+              android:paddingHorizontal="24.0dp" xmlns:android="http://schemas.android.com/apk/res/android">
+  <com.google.android.material.materialswitch.MaterialSwitch android:id="@id/switch1"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/interpolation_switch" />
+  <com.google.android.material.textfield.TextInputLayout android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8.0dp"
+                        style="?attr/textInputOutlinedExposedDropdownMenuStyle">
+    <AutoCompleteTextView android:id="@id/video_sync"
+                          android:layout_width="fill_parent"
+                          android:layout_height="wrap_content"
+                          android:hint="@string/interpolation_video_sync"
+                          android:inputType="none" />
+  </com.google.android.material.textfield.TextInputLayout>
+</LinearLayout>

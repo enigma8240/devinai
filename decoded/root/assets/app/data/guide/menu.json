@@ -1,0 +1,95 @@
+{
+    "reuse": false,
+    "name": "Content Guide",
+    "version": "1.0.0",
+    "headline": "Content Guide",   
+    "menu": [{
+            "type": "separator",
+            "label": "Pattern"
+        }, {
+            "label": "Pages",
+            "data": "data:guide:pages"
+        }, {
+            "label": "Panel",
+            "data": {
+                "type": "pages",
+                "pages": [{  
+                        "items": [{
+                                "type": "button",                                
+                                "layout": "0,0,3,3",
+                                "icon": "web-asset",
+                                "label": "Panel",
+                                "action": "panel:data:guide:panel"
+                            }]
+                    }]
+            }
+        }, {          
+            "label": "List",
+            "data": "data:guide:list"
+        }, {
+            "label": "Stacked List",
+            "data": "data:guide:stacked_list"
+        }, {
+            "label": "Template",
+            "data": "data:guide:template"
+        }, {
+            "type": "separator",
+            "label": "Content"
+        }, {
+            "label": "Types",
+            "data": "data:guide:types"
+        }, {
+            "label": "Special",
+            "data": "data:guide:special"
+        }, {
+            "label": "Text",
+            "data": "data:guide:text"
+        }, {
+            "label": "Text & Image",
+            "data": "data:guide:text_image"
+        }, {
+            "label": "Image Filler",
+            "data": "data:guide:image_filler"
+        }, {
+            "label": "Image Width",
+            "data": "data:guide:image_width"
+        }, {
+            "label": "Image Height",
+            "data": "data:guide:image_height"
+        }, {
+            "label": "Icons",
+            "data": "data:guide:icons"
+        }, {
+            "display": false,
+            "label": "Icon Names",
+            "data": "data:guide:icon_names"
+        }, {
+            "label": "Icon Sizes",
+            "data": "data:guide:icon_sizes"
+        }, {
+            "type": "separator",
+            "label": "Actions"
+        }, {
+            "label": "Videos",
+            "data": "data:guide:videos"
+        }, {
+            "label": "Audios",
+            "data": "data:guide:audios"
+        }, {
+            "label": "Images",
+            "data": "data:guide:images"
+        }, {
+            "label": "Links",
+            "data": "data:guide:links"
+        }, {
+            "label": "Mixed",
+            "data": "data:guide:mixed"
+        }, {         
+            "label": "References",
+            "data": "data:guide:references"
+        }, {         
+            "label": "Messages",
+            "data": "data:guide:messages"
+        }
+    ]
+}

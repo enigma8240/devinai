@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<RelativeLayout android:layout_width="fill_parent"
+                android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:newenigmahd="http://schemas.android.com/apk/res-auto">
+  <TableRow android:id="@id/buttonRow"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true">
+    <android.widget.Button android:id="@id/primaryBtn"
+                          android:layout_width="0.0dp"
+                          android:layout_height="wrap_content"
+                          android:text="@string/track_primary"
+                          android:layout_weight="1.0"
+                          style="@style/Widget.AppCompat.Button.Borderless.Colored" />
+    <android.widget.Button android:id="@id/secondaryBtn"
+                          android:layout_width="0.0dp"
+                          android:layout_height="wrap_content"
+                          android:text="@string/track_secondary"
+                          android:layout_weight="1.0"
+                          style="@style/Widget.AppCompat.Button.Borderless.Colored" />
+  </TableRow>
+  <View android:id="@id/divider"
+        android:background="?android:attr/listDivider"
+        android:layout_width="fill_parent"
+        android:layout_height="1.0dp"
+        android:layout_below="@id/buttonRow" />
+  <androidx.recyclerview.widget.RecyclerView android:id="@id/list"
+                        android:padding="8.0dp"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/divider"
+                        newenigmahd:layoutManager="LinearLayoutManager" />
+</RelativeLayout>

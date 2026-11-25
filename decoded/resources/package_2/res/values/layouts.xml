@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<resources>
+  <layout name="abc_action_bar_up_container">res/layout/abc_action_bar_up_container.xml</layout>
+  <layout name="abc_action_menu_layout">res/layout/abc_action_menu_layout.xml</layout>
+  <layout name="abc_action_mode_bar">res/layout/abc_action_mode_bar.xml</layout>
+  <layout name="abc_action_mode_close_item_material">res/layout/abc_action_mode_close_item_material.xml</layout>
+  <layout name="abc_activity_chooser_view">res/layout/abc_activity_chooser_view.xml</layout>
+  <layout name="abc_activity_chooser_view_list_item">res/layout/abc_activity_chooser_view_list_item.xml</layout>
+  <layout name="abc_dialog_title_material">res/layout/abc_dialog_title_material.xml</layout>
+  <layout name="abc_list_menu_item_icon">res/layout/abc_list_menu_item_icon.xml</layout>
+  <layout name="abc_list_menu_item_layout">res/layout/abc_list_menu_item_layout.xml</layout>
+  <layout name="abc_list_menu_item_radio">res/layout/abc_list_menu_item_radio.xml</layout>
+  <layout name="abc_popup_menu_header_item_layout">res/layout/abc_popup_menu_header_item_layout.xml</layout>
+  <layout name="abc_screen_simple">res/layout/abc_screen_simple.xml</layout>
+  <layout name="abc_screen_simple_overlay_action_mode">res/layout/abc_screen_simple_overlay_action_mode.xml</layout>
+  <layout name="abc_search_view">res/layout/abc_search_view.xml</layout>
+  <layout name="abc_select_dialog_material">res/layout/abc_select_dialog_material.xml</layout>
+  <layout name="notification_template_part_chronometer">res/layout/notification_template_part_chronometer.xml</layout>
+  <layout name="notification_template_part_time">res/layout/notification_template_part_time.xml</layout>
+</resources>

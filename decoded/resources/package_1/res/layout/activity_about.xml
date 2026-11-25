@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<LinearLayout android:gravity="center"
+              android:orientation="vertical"
+              android:id="@id/main"
+              android:layout_width="fill_parent"
+              android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
+  <ImageView android:layout_width="100.0dp"
+             android:layout_height="100.0dp"
+             android:layout_marginTop="16.0dp"
+             android:layout_marginBottom="16.0dp"
+             android:src="@drawable/mpv_logo"
+             android:contentDescription="@string/mpv_activity"
+             android:layout_marginVertical="16.0dp" />
+  <androidx.core.widget.NestedScrollView android:layout_width="fill_parent"
+                        android:layout_height="fill_parent"
+                        android:layout_margin="16.0dp">
+    <HorizontalScrollView android:layout_width="fill_parent"
+                          android:layout_height="fill_parent">
+      <TextView android:id="@id/logs"
+                android:padding="12.0dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textIsSelectable="true"
+                android:fontFamily="monospace" />
+    </HorizontalScrollView>
+  </androidx.core.widget.NestedScrollView>
+</LinearLayout>
