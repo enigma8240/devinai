@@ -13017,6 +13017,10 @@
 
     move-result v2
 
+    # 26 Kasim: cikis onay penceresi her zaman kapali - geri tusu playlist'te
+    # oge kalsa bile dogrudan MSX/kanal listesine donsun, kullanici tercihini yok sayiyoruz.
+    const/4 v2, 0x0
+
     iput-boolean v2, p0, Lis/xyz/mpv/MPVActivity;->playlistExitWarning:Z
 
     .line 802
